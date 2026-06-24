@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+{% block title %}LangGraph 狀態圖 Agent — 賽馬娘情報站{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ── LangGraph Agent Chat 主題自適應樣式 ── */
+.lg-banner {
+  background: linear-gradient(135deg, #1d4ed8, color-mix(in srgb, #1d4ed8 50%, var(--color-bg-elevated)));
+  border-radius: var(--radius-md);
+}
+.lg-flow-card {
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+}
+.lg-flow-badge {
+  background: color-mix(in srgb, #1d4ed8 20%, var(--color-bg-elevated));
+  color: var(--color-text-primary);
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+.lg-chat-outer {
+  background: var(--color-bg-base);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+.lg-chat-divider {
+  border-color: var(--color-border) !important;
+}
+.lg-input {
+  background: var(--color-bg-elevated) !important;
+  border-color: var(--color-border) !important;
+  color: var(--color-text-primary) !important;
+}
+.lg-input::placeholder { color: var(--color-text-secondary) !important; }
+
+/* 對話氣泡 */
+.lg-bubble-bot {
+  background: var(--color-bg-elevated);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
+}
+.lg-bubble-user {
+  background: #1d4ed8;
+  color: #fff;
+}
+
+/* 思考中泡泡 */
+.lg-thinking-bubble {
+  background: var(--color-bg-surface);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="row">
+    <div class="col-lg-8 mx-auto">
+
+      <!-- 頁首 -->
+      <div class="lg-banner mb-3">
+        <div class="card-body p-4">
+          <h2 class="mb-1 fw-bold text-white">🔗 LangGraph 狀態圖 Agent</h2>
+          <p class="mb-2 opacity-75 text-white">Phase 3 — 顯式狀態機，更精確可控的 Agent 流程</p>
+          <div class="d-flex gap-2 flex-wrap">
+            <span class="badge text-white" style="background:rgba(255,255,255,0.25);">LangGraph</span>
+            <span class="badge text-white" style="background:rgba(255,255,255,0.25);">{{ model_name }}</span>
+            <span class="badge text-white" style="background:rgba(255,255,255,0.25);">StateGraph</span>
+            <span class="badge text-white" style="background:rgba(255,255,255,0.25);">工具呼叫上限保護</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 流程說明 -->
+      <div class="lg-flow-card mb-3">
+        <div class="card-body py-3 px-4">
+          <div class="d-flex align-items-center gap-3 flex-wrap" style="font-size:13px;">
+            <span>🟢 START</span>
+            <span>→</span>
+            <span class="lg-flow-badge">call_model</span>
+            <span>→ 有 tool_calls?</span>
+            <span>→</span>
+            <span class="lg-flow-badge">call_tools</span>
+            <span>→ 回到 call_model</span>
+            <span>→</span>
+            <span>🔴 END</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 聊天視窗 -->
+      <div class="lg-chat-outer">
+        <div class="card-body p-0">
+          <div id="chatWindow" class="p-3" style="height:420px;overflow-y:auto;">
+            <div class="d-flex mb-3">
+              <div class="lg-bubble-bot rounded-3 p-3" style="max-width:80%;">
+                <strong>🔗 LangGraph Agent</strong><br>
+                你好！我是使用 LangGraph 狀態圖架構的 Agent。
+                我的推理流程由顯式狀態機控制，確保工具呼叫次數合理（最多 8 次）。
+                請問有什麼需要？
+              </div>
+            </div>
+          </div>
+          <div class="border-top lg-chat-divider p-3">
+            <div class="d-flex gap-2">
+              <input type="text" id="userInput" class="form-control lg-input"
+                     placeholder="例：最近有什麼活動公告？" />
+              <button class="btn btn-primary px-4" id="sendBtn" onclick="sendMsg()">發送</button>
+              <button class="btn btn-outline-secondary" onclick="clearHistory()" title="重置 Graph">↺</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const chatWindow = document.getElementById('chatWindow');
+const userInput  = document.getElementById('userInput');
+const sendBtn    = document.getElementById('sendBtn');
+
+userInput.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) sendMsg(); });
+
+function appendMsg(role, text) {
+  const isUser = role === 'user';
+  const d = document.createElement('div');
+  d.className = 'd-flex mb-3' + (isUser ? ' justify-content-end' : '');
+  const bubble = document.createElement('div');
+  bubble.className = 'rounded-3 p-3 ' + (isUser ? 'lg-bubble-user' : 'lg-bubble-bot');
+  bubble.style.maxWidth = '80%';
+  bubble.style.whiteSpace = 'pre-wrap';
+  bubble.innerHTML = (isUser ? '' : '<strong>🔗 LangGraph Agent</strong><br>') + text;
+  d.appendChild(bubble);
+  chatWindow.appendChild(d);
+  chatWindow.scrollTop = chatWindow.scrollHeight;
+}
+
+function appendThinking() {
+  const d = document.createElement('div');
+  d.id = 'thinking';
+  d.className = 'd-flex mb-3';
+  const bubble = document.createElement('div');
+  bubble.className = 'rounded-3 p-3 lg-thinking-bubble';
+  bubble.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>狀態機執行中...';
+  d.appendChild(bubble);
+  chatWindow.appendChild(d);
+  chatWindow.scrollTop = chatWindow.scrollHeight;
+}
+
+function removeThinking() {
+  const el = document.getElementById('thinking');
+  if (el) el.remove();
+}
+
+async function sendMsg() {
+  const msg = userInput.value.trim();
+  if (!msg) return;
+  userInput.value = '';
+  sendBtn.disabled = true;
+  appendMsg('user', msg);
+  appendThinking();
+
+  try {
+    const resp = await fetch('api/chat/', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken')},
+      body: JSON.stringify({message: msg}),
+    });
+    const data = await resp.json();
+    removeThinking();
+    appendMsg('bot', data.reply || data.error || '（無回覆）');
+  } catch (e) {
+    removeThinking();
+    appendMsg('bot', '網路錯誤：' + e.message);
+  } finally {
+    sendBtn.disabled = false;
+    userInput.focus();
+  }
+}
+
+async function clearHistory() {
+  await fetch('api/clear/', {
+    method: 'POST',
+    headers: {'X-CSRFToken': getCookie('csrftoken')},
+  });
+  chatWindow.innerHTML = '';
+  const d = document.createElement('div');
+  d.className = 'd-flex mb-3';
+  const bubble = document.createElement('div');
+  bubble.className = 'rounded-3 p-3 lg-bubble-bot';
+  bubble.style.maxWidth = '80%';
+  bubble.innerHTML = '<strong>🔗 LangGraph Agent</strong><br>Graph 已重置，有什麼需要嗎？';
+  d.appendChild(bubble);
+  chatWindow.appendChild(d);
+}
+
+function getCookie(name) {
+  return document.cookie.split(';').map(c => c.trim())
+    .find(c => c.startsWith(name + '='))?.split('=')[1] || '';
+}
+</script>
+{% endblock %}

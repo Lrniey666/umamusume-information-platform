@@ -1,0 +1,313 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}留言情感儀表板 — 賽馬娘資訊平台{% endblock %}
+
+{% block extra_css %}
+<style>
+  .sentiment-bar { height: 8px; border-radius: 4px; background: var(--color-border); overflow: hidden; }
+  .sentiment-bar-fill { height: 100%; border-radius: 4px; transition: width .5s ease; }
+  .bar-positive { background: var(--color-positive); }
+  .bar-negative { background: var(--color-negative); }
+  .bar-neutral  { background: var(--color-text-disabled); }
+
+  .article-card {
+    background: var(--color-bg-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    padding: 1rem 1.2rem;
+    transition: box-shadow .2s;
+  }
+  .article-card:hover { box-shadow: 0 4px 18px var(--color-shadow-md); }
+  .article-title { font-weight: 600; font-size: .95rem; color: var(--color-text-primary); }
+  .article-meta  { font-size: .78rem; color: var(--color-text-secondary); margin-top: .2rem; }
+  .badge-source  {
+    display: inline-block;
+    font-size: .68rem; padding: 2px 8px; border-radius: 10px;
+    background: var(--color-accent-muted); color: var(--color-accent);
+    font-weight: 600;
+  }
+  .badge-cat {
+    display: inline-block;
+    font-size: .68rem; padding: 2px 8px; border-radius: 10px;
+    background: rgba(0,0,0,.06); color: var(--color-text-secondary);
+  }
+  .emotion-mini-chart { max-width: 120px; margin: 0 auto; }
+  .score-pill {
+    font-size: .78rem; padding: 3px 10px; border-radius: 20px; font-weight: 600;
+  }
+  .pill-pos { background: rgba(46,158,107,.12); color: var(--color-positive); }
+  .pill-neg { background: rgba(217,80,63,.12);  color: var(--color-negative); }
+  .pill-neu { background: rgba(0,0,0,.06);       color: var(--color-text-secondary); }
+  .pill-na  { background: rgba(0,0,0,.04);       color: var(--color-text-disabled); }
+
+  .scheduler-panel {
+    background: var(--color-bg-elevated);
+    border: 1px solid var(--color-border);
+    border-radius: 10px; padding: 1rem 1.2rem;
+  }
+  #loadingSpinner { display: none; }
+  .empty-state-box {
+    text-align: center; padding: 3rem 1rem;
+    color: var(--color-text-secondary);
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="col-lg-12">
+
+  <!-- 頁首 -->
+  <div class="d-flex align-items-center gap-3 my-3">
+    <div>
+      <h2 class="mb-0 fw-bold" style="color:var(--color-text-primary);">
+        💬 留言情感儀表板
+      </h2>
+      <p class="mb-0" style="font-size:.85rem;color:var(--color-text-secondary);">
+        遊戲公告情緒分析 &nbsp;·&nbsp; 巴哈姆特 bsn=34421 &amp; 多來源資料
+      </p>
+    </div>
+    <div class="ms-auto d-flex gap-2">
+      <button class="btn btn-sm btn-outline-secondary" onclick="loadData()">🔄 重新整理</button>
+    </div>
+  </div>
+
+  <!-- 統計卡片列 -->
+  <div class="row g-3 mb-4" id="statsRow">
+    <div class="col-6 col-md-3">
+      <div class="article-card text-center">
+        <div id="statTotal" style="font-size:2rem;font-weight:800;color:var(--color-accent);">—</div>
+        <div style="font-size:.8rem;color:var(--color-text-secondary);">文章總數</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="article-card text-center">
+        <div id="statAnalyzed" style="font-size:2rem;font-weight:800;color:var(--color-positive);">—</div>
+        <div style="font-size:.8rem;color:var(--color-text-secondary);">已分析</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="article-card text-center">
+        <div id="statPos" style="font-size:2rem;font-weight:800;color:var(--color-positive);">—</div>
+        <div style="font-size:.8rem;color:var(--color-text-secondary);">正面 ≥0.6</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="article-card text-center">
+        <div id="statNeg" style="font-size:2rem;font-weight:800;color:var(--color-negative);">—</div>
+        <div style="font-size:.8rem;color:var(--color-text-secondary);">負面 ≤0.4</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <!-- 左欄：公告列表 -->
+    <div class="col-lg-8">
+
+      <!-- 搜尋列 -->
+      <div class="input-group mb-3">
+        <input type="text" id="searchInput" class="form-control"
+               placeholder="搜尋公告標題或內文…" onkeydown="if(event.key==='Enter')loadData()">
+        <button class="btn btn-primary" onclick="loadData()">搜尋</button>
+      </div>
+
+      <!-- 載入中 -->
+      <div id="loadingSpinner" class="text-center py-4">
+        <div class="spinner-border" style="color:var(--color-accent);"></div>
+        <div style="color:var(--color-text-secondary);margin-top:.5rem;">載入中…</div>
+      </div>
+
+      <!-- 公告列表 -->
+      <div id="articleList"></div>
+    </div>
+
+    <!-- 右欄：情緒說明 -->
+    <div class="col-lg-4">
+      <!-- 情緒說明 -->
+      <div class="scheduler-panel">
+        <h6 class="fw-bold mb-3" style="color:var(--color-text-primary);">📊 情緒六維度說明</h6>
+        <ul style="font-size:.82rem;color:var(--color-text-secondary);padding-left:1.2rem;margin:0;">
+          <li><strong>興奮</strong>：對活動/新內容的期待</li>
+          <li><strong>開心</strong>：愉快、滿意的反應</li>
+          <li><strong>五味雜陳</strong>：複雜、矛盾的情緒</li>
+          <li><strong>失望</strong>：未達期望的反應</li>
+          <li><strong>生氣</strong>：對決策/調整的憤怒</li>
+          <li><strong>悲傷</strong>：惋惜、遺憾的情緒</li>
+        </ul>
+        <hr style="border-color:var(--color-border);">
+        <div style="font-size:.78rem;color:var(--color-text-disabled);">
+          正面 ≥ 0.6 &nbsp;·&nbsp; 負面 ≤ 0.4 &nbsp;·&nbsp; 中性 0.4–0.6
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- 情緒圓餅圖 Modal -->
+<div class="modal fade" id="emotionModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="background:var(--color-bg-surface);border:1px solid var(--color-border);">
+      <div class="modal-header" style="border-color:var(--color-border);">
+        <h6 class="modal-title fw-bold" id="emotionModalTitle"></h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body text-center">
+        <canvas id="emotionChart" width="280" height="280" style="max-width:280px;"></canvas>
+        <div id="emotionLegend" class="mt-3" style="font-size:.82rem;color:var(--color-text-secondary);"></div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+let _articles = [];
+let _emotionChart = null;
+
+// ── 載入公告資料 ─────────────────────────────────────────────
+function loadData() {
+  const q = document.getElementById('searchInput').value.trim();
+  document.getElementById('loadingSpinner').style.display = 'block';
+  document.getElementById('articleList').innerHTML = '';
+
+  fetch(`{% url 'app_comment_sentiment:api_data' %}?q=${encodeURIComponent(q)}`)
+    .then(r => r.json())
+    .then(data => {
+      _articles = data.articles || [];
+      document.getElementById('loadingSpinner').style.display = 'none';
+      renderStats(data);
+      renderArticles(_articles);
+    })
+    .catch(err => {
+      document.getElementById('loadingSpinner').style.display = 'none';
+      document.getElementById('articleList').innerHTML =
+        `<div class="empty-state-box"><div>⚠️ 資料載入失敗：${err}</div></div>`;
+    });
+}
+
+// ── 統計卡片 ────────────────────────────────────────────────
+function renderStats(data) {
+  const articles = data.articles || [];
+  const total    = data.total || 0;
+  const analyzed = articles.filter(a => a.analyzed).length;
+  const pos      = articles.filter(a => a.positive_score !== null && a.positive_score >= 0.6).length;
+  const neg      = articles.filter(a => a.negative_score !== null && a.negative_score >= 0.6).length;
+  document.getElementById('statTotal').textContent    = total;
+  document.getElementById('statAnalyzed').textContent = analyzed;
+  document.getElementById('statPos').textContent      = pos;
+  document.getElementById('statNeg').textContent      = neg;
+}
+
+// ── 公告卡片列表 ─────────────────────────────────────────────
+function renderArticles(articles) {
+  const el = document.getElementById('articleList');
+  if (!articles.length) {
+    el.innerHTML = `<div class="empty-state-box">
+      <div class="empty-icon" style="font-size:2.5rem;">📭</div>
+      <div class="mt-2">目前尚無公告資料。請執行爬蟲或資料匯入後再查看。</div>
+    </div>`;
+    return;
+  }
+
+  el.innerHTML = articles.map((a, idx) => {
+    const pillClass = a.positive_score === null ? 'pill-na'
+      : a.positive_score >= 0.6 ? 'pill-pos'
+      : a.negative_score !== null && a.negative_score >= 0.6 ? 'pill-neg'
+      : 'pill-neu';
+    const pillLabel = a.positive_score === null ? '未分析'
+      : a.positive_score >= 0.6 ? `😊 正面 ${(a.positive_score*100).toFixed(0)}%`
+      : a.negative_score !== null && a.negative_score >= 0.6 ? `😤 負面 ${(a.negative_score*100).toFixed(0)}%`
+      : `😐 中性`;
+
+    const hasEmotion = a.analyzed && Object.keys(a.emotion).length > 0;
+    const emotionBtn = hasEmotion
+      ? `<button class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="showEmotion(${idx})" style="font-size:.72rem;">📊 情緒</button>`
+      : '';
+
+    const titleLink = a.url
+      ? `<a href="${a.url}" target="_blank" rel="noopener" class="article-title" style="text-decoration:none;">${escHtml(a.title)}</a>`
+      : `<span class="article-title">${escHtml(a.title)}</span>`;
+
+    return `
+    <div class="article-card mb-2">
+      <div class="d-flex align-items-start gap-2">
+        <div class="flex-grow-1">
+          ${titleLink}
+          <div class="article-meta mt-1">
+            <span class="badge-source">${escHtml(a.source)}</span>
+            <span class="badge-cat ms-1">${escHtml(a.category)}</span>
+            ${a.published_date ? `<span class="ms-2">${a.published_date}</span>` : ''}
+          </div>
+        </div>
+        <div class="d-flex flex-column align-items-end gap-1">
+          <span class="score-pill ${pillClass}">${pillLabel}</span>
+          ${emotionBtn}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── 情緒圓餅圖 Modal ─────────────────────────────────────────
+function showEmotion(idx) {
+  const a = _articles[idx];
+  if (!a || !a.emotion) return;
+
+  document.getElementById('emotionModalTitle').textContent = a.title.slice(0, 40);
+
+  const labels = ['興奮', '開心', '五味雜陳', '失望', '生氣', '悲傷'];
+  const values = [
+    a.emotion.excited || 0,
+    a.emotion.happy || 0,
+    a.emotion.mixed || 0,
+    a.emotion.disappointed || 0,
+    a.emotion.angry || 0,
+    a.emotion.sad || 0,
+  ];
+  const colors = ['#7C3AED','#34D399','#FBBF24','#FB923C','#F87171','#60A5FA'];
+
+  if (_emotionChart) { _emotionChart.destroy(); }
+  const ctx = document.getElementById('emotionChart').getContext('2d');
+  _emotionChart = new Chart(ctx, {
+    type: 'pie',
+    data: {
+      labels,
+      datasets: [{ data: values, backgroundColor: colors, borderWidth: 1 }]
+    },
+    options: {
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.label}: ${ctx.parsed.toFixed(1)}%`
+          }
+        }
+      }
+    }
+  });
+
+  const legendHtml = labels.map((l, i) =>
+    `<span style="display:inline-flex;align-items:center;gap:4px;margin:3px 6px;">
+       <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${colors[i]};"></span>
+       ${l}: ${values[i].toFixed(1)}%
+     </span>`
+  ).join('');
+  document.getElementById('emotionLegend').innerHTML = legendHtml;
+
+  new bootstrap.Modal(document.getElementById('emotionModal')).show();
+}
+
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadData();
+});
+</script>
+{% endblock %}

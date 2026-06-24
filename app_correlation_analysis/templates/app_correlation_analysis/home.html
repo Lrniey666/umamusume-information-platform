@@ -1,0 +1,384 @@
+{% extends 'base.html' %}
+{% block title %}
+  資料趨勢關聯分析
+{% endblock %}
+{% block content %}
+  <div class="col-lg-12">
+    <h1>行銷應用:檢查兩組聲量序列資料是否存在線性關係</h1>
+    <p>相關分析:計算各組關鍵字的每日聲量(被報導的篇數)，除可看出各組的人氣變化外，也可比較兩組的走勢是否相似會背離，或者無關，計算其相關係數，洞悉察覺出兩組關鍵字事件或人物之間是否有相關。</p>
+  
+    <h2>輿情應用範例:</h2>
+    <div class="mb-3">
+      <ul>
+      <li>分析事件與人物聲量的相關性（例如某政治人物的發言是否影響了某事件的討論熱度）</li>
+      <li>候選人的新聞聲量 vs. 分析特定議題（如經濟政策、環保政策）的新聞報導頻率，檢查其是否影響該候選人獲得選民支持的情況</li>
+      <li>比較不同平台（Twitter、Facebook、新聞媒體）上的聲量變化，檢查趨勢是否一致</li>
+      <li>觀察特定關鍵詞（如「罷工」或「選舉」）的討論聲量是否隨時間變化而同步</li>
+      <li>選舉期間，某候選人的社交媒體聲量是否與新聞報導量呈線性關係</li>
+      </ul>
+    </div>
+
+    <h3>商業應用案例:</h3>
+    <div class="mb-4">
+      <ul>
+      <li>iPhone vs. Samsung 新聞報導聲量，檢查兩家品牌的媒體曝光是否與市場銷量有關聯</li>
+      <li>可口可樂（Coca-Cola） vs. 百事可樂（Pepsi）新聞聲量 vs. 銷售數據，研究品牌競爭與市場份額的變化</li>
+      <li>品牌行銷活動是否影響社交媒體上的討論熱度</li>
+      <li>Elon Musk 發推文是否影響特斯拉 (TSLA) 股價</li>
+      <li>某公司負面新聞曝光後，其股價是否下降</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 輸入條件區塊開始 -->
+  <div class="col-lg-6 mb-5">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="h6 text-uppercase mb-0">輸入條件</h3>
+      </div>
+      <div class="card-body">
+        <!-- 新聞類別選單 form group -->
+        <div class="mb-3 row">
+          <label class="col-sm-3 col-form-label">選擇範例</label>
+          <div class="col-md-9">
+            <select id="select_example_demo" name="example_demo" class="form-select">
+              <!-- <option>請選擇</option> -->
+              <option value="1">範例1:陳時中、冠狀肺炎</option>
+              <option value="2">範例2:陳時中、台北市長</option>
+              <option value="3">範例3:張忠謀、台積電</option>
+              <option value="4">範例4::陳時中、蔡英文</option>
+            </select>
+            <div class="form-text">選擇一個範例</div>
+          </div>
+        </div>
+        <!-- form group -->
+
+        <!--  -->
+        <div class="mb-3 row">
+          <label class="col-md-3 col-form-label">第1組關鍵詞?</label>
+          <div class="col-md-9">
+            <input id="input_keyword1" name="userkey" value="陳時中" class="form-control" />
+            <div class="form-text">查找關鍵字，可輸入多個，空白隔開。主要以人名，產品，地理區域為主(搜尋斷詞後的詞語，並非全文搜尋)。</div>
+          </div>
+        </div>
+        <!--  -->
+        <div class="mb-3 row">
+          <label class="col-sm-3 col-form-label">條件</label>
+
+          <div class="col-md-9 pt-2">
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" value="and" name="condradio" id="condradio1" />
+              <label class="form-check-label" for="condradio1">and</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" value="or" name="condradio" id="condradio2" checked />
+              <label class="form-check-label" for="condradio2">or</label>
+            </div>
+          </div>
+        </div>
+
+        <!--  -->
+        <div class="mb-3 row">
+          <label class="col-md-3 col-form-label">第2組關鍵詞?</label>
+          <div class="col-md-9">
+            <input id="input_keyword2" name="userkey" value="疫苗 冠狀肺炎 疫情" class="form-control" />
+            <div class="form-text">查找關鍵字，可輸入多個，空白隔開。主要以人名，產品，地理區域為主(搜尋斷詞後的詞語，並非全文搜尋)。</div>
+          </div>
+        </div>
+        <!--  -->
+        <div class="mb-3 row">
+          <label class="col-sm-3 col-form-label">條件</label>
+
+          <div class="col-md-9 pt-2">
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" value="and" name="condradio2" id="condradio2-1" />
+              <label class="form-check-label" for="condradio2-1">and</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" value="or" name="condradio2" id="condradio2-2" checked />
+              <label class="form-check-label" for="condradio2-2">or</label>
+            </div>
+          </div>
+        </div>
+        <!--  -->
+        <div class="mb-3 row">
+          <label class="col-md-3 col-form-label">最近多少周?</label>
+          <div class="col-md-9 pt-2">
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" value="4" name="wkradio" id="wkradio1" />
+              <label class="form-check-label" for="wkradio1">4</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" value="6" name="wkradio" id="wkradio2" />
+              <label class="form-check-label" for="wkradio2">6</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" value="8" name="wkradio" id="wkradio3" />
+              <label class="form-check-label" for="wkradio3">8</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" value="12" name="wkradio" id="wkradio4" checked />
+              <label class="form-check-label" for="wkradio4">12</label>
+            </div>
+            <div class="form-text">以最新資料時間為準，往前推多少周?</div>
+          </div>
+        </div>
+        <div class="mb-3 row">
+          <div class="col-md-9 ms-auto">
+            <button type="button" id="btn_ok" class="btn btn-primary">查詢</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- 輸入區塊結束 -->
+  <!-- 顯示區塊 -->
+  <div class="col-lg-6 mb-2">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="h6 text-uppercase mb-0">皮爾森Pearson相關係數</h3>
+      </div>
+      <div class="card-body">
+        <div class="row">
+          <!-- container -->
+          <div class="container">
+            <!-- Content -->
+            <div id="person_correlation"></div>
+            <hr />
+            <p>
+              The Pearson correlation coefficient measures the linear association between variables. Its value can be interpreted like so:<ul>
+                <li>+1 - Complete positive correlation</li>
+                <li>+0.8 - Strong positive correlation</li>
+                <li>+0.6 - Moderate positive correlation</li>
+                <li>0 - no correlation whatsoever ==>無線性關聯，但不代表沒有關係</li>
+                <li>-0.6 - Moderate negative correlation</li>
+                <li>-0.8 - Strong negative correlation</li>
+                <li>-1 - Complete negative correlation</li>
+              </ul>
+            </p>
+          </div>
+          <!-- /.container -->
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- 區塊結束 -->
+
+  <!-- 顯示區塊 -->
+  <div class="col-lg-12 mb-2">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="h6 text-uppercase mb-0">總聲量變化比較</h3>
+      </div>
+      <div class="card-body">
+        <!-- description -->
+        <h3>顯示每天的聲量的變化趨勢</h3>
+        <p>觀察重點:兩條線分佈的走勢是否一致或背離?哪一天爆大量?哪一天開始消退?</p>
+        <hr />
+        <canvas id="line_chart"></canvas>
+      </div>
+    </div>
+  </div>
+  <!-- 區塊結束 -->
+{% endblock %}
+
+{% block extra_js %}
+  <!-- 繪製line chart會用到，必須在chartjs之前先載入 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.13.0/moment.min.js"></script>
+  <!-- chartjs圖js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.3/Chart.min.js"></script>
+
+  <script>
+  //**初始化
+  call_ajax();
+
+  //**按鈕事件
+  $("#btn_ok").on("click", function () {
+    call_ajax();
+  }); //event function
+
+  $("input[name='wkradio']").on("change", function () {
+    //call_ajax();
+  }); //event function
+  $("input[name='condradio']").on("change", function () {
+    //call_ajax();
+  }); //event function
+
+  $('#select_example_demo').on('change', function() {
+
+    let example_num = $('#select_example_demo').val();
+    console.log(example_num);
+
+    if (example_num==1)
+    {
+      $("#input_keyword1").val("陳時中");
+      $("#input_keyword2").val('疫苗 冠狀肺炎 疫情');
+      call_ajax(); 
+      
+    }else if(example_num==2)
+    {
+      $("#input_keyword1").val("陳時中");
+      $("#input_keyword2").val('台北市市長 台北市長');
+      call_ajax(); 
+      
+    }else if(example_num==3)
+    {
+      $("#input_keyword1").val("張忠謀 台積電");
+      $("#input_keyword2").val('半導體 IC');
+      call_ajax(); 
+      
+    }else if(example_num==4)
+    {
+      $("#input_keyword1").val("蔡英文");
+      $("#input_keyword2").val('陳時中');
+      call_ajax(); 
+    }
+
+
+
+  }); //event function
+
+
+  function call_ajax() {
+    const userkey1 = $("#input_keyword1").val();
+    const userkey2 = $("#input_keyword2").val();
+    const weeks = $("input[name='wkradio']:checked").val();
+    const cate = $("input[name='cateradio']:checked").val();
+    const cond = $("input[name='condradio']:checked").val();
+
+    if ((userkey1.length < 2) | (userkey1.length < 2)) {
+      alert("輸入關鍵字不可空白或小於兩個中文字!");
+      return 0;
+    }
+
+    $.ajax({
+      type: "POST",
+      url: "api_get_corr_data/", //Relative URL，因為我們在app_correlation_analysis/urls.py裡面定義了路徑，所以這裡直接寫api_get_corr_data/就好，不需要寫完整路徑
+      data: {
+        userkey1: userkey1,
+        userkey2: userkey2,
+        cond: cond,
+        weeks: weeks,
+      }, // pass to server
+      success: function (received) {
+        const a_line_xy_data = received["a_line_xy_data"];
+        const b_line_xy_data = received["b_line_xy_data"];
+        const pearson_coef = received["pearson_coef"];
+        const p_value = received["p_value"];
+        showCorrelation(pearson_coef, p_value);
+        showLineChart(a_line_xy_data, b_line_xy_data);
+      }, //function
+    }); //ajax
+  } //call_ajax()
+
+  //display data and show chart
+  // *****************
+  function showCorrelation(pearson_coef, p_value) {
+    // remove previous display
+    $("#person_correlation").empty();
+
+    // paste items we like to display using "li" tag
+    let result = `
+    <h1>相關係數:${pearson_coef}</h1>
+    <h1>顯著水準(p-value):${p_value}</h1>`;
+
+    $("#person_correlation").append(result);
+  }
+
+  //display data and show chart
+  // *****************
+  // Line chart
+  function showLineChart(a_line_xy_data, b_line_xy_data) {
+    const lineChartElem = document
+      .getElementById("line_chart")
+      .getContext("2d");
+
+    const myoptions = {
+      type: "line",
+      data: {
+        datasets: [
+          {
+            //label: "s1",
+            borderColor: randomColors(1),
+            backgroundColor: randomColors(1),
+            borderWidth: 5,
+            data: a_line_xy_data,
+          },
+          {
+            //label: "s2",
+            borderColor: randomColors(1),
+            backgroundColor: randomColors(1),
+            borderWidth: 1,
+            data: b_line_xy_data,
+          },
+        ], //多條線圖在此datasets的陣列內新增即可!!
+      },
+      options: {
+        legend: {
+          display: false,
+        },
+        title: {
+          display: true,
+          text: '分佈圖:粗線條是第一組關鍵字',
+        },
+        scales: {
+          xAxes: [
+            {
+              type: "time", // 時間軸型態的X軸
+              time: {
+                unit: "day", //'week' //這裡定義以天或周為單位
+                displayFormats: {
+                  //day: 'DD-MM-YYYY'
+                  day: "MM/DD",
+                },
+              },
+            },
+          ],
+          yAxes: [
+            {
+              ticks: {
+                beginAtZero: true, //從0開始
+                responsive: true, //符合響應式
+              },
+              display: true,
+              scaleLabel: {
+                display: true,
+                labelString: "出現次數",
+              },
+            },
+          ],
+        },
+      },
+    };
+
+    // 檢查line_chart變數是否存在，如果存在，表示已經有之前畫的圖，必須要先清除之後，再畫新的圖。否則會有新舊圖重疊現象
+    //用以下這種方式檢查與清除舊圖。window指的是這個頁面，這個頁面有很多變數存在，檢查line_chart是否存在，若有存在，必須要先清除之後，再畫新的圖。否則會有新舊圖重疊現象
+    if (window.time_line_chart) {
+      time_line_chart.destroy();
+    }
+
+    // 畫一張新圖(產生一個圖物件變數名稱為line_chart)
+    // 必須全域變數--注意:前面不要有let, var, const等修飾詞
+    // 理由: 我們要讓它存在於網頁全域變數，
+    // 這樣我們才方便判斷是否有前一次的圖，如果存在有，要刪除之，否則，很多張圖會疊在一起
+    time_line_chart = new Chart(lineChartElem, myoptions);
+  }
+
+  // randomize color
+  function randomColors(length) {
+    var pool = [];
+    for (i = 0; i < length; i++) {
+      pool.push(dynamicColors());
+    }
+    return pool;
+  }
+
+  function dynamicColors() {
+    // rgb + alpha(transparent color透明度) 透明度請自行調整 數字越小越透明
+    var r = Math.floor(Math.random() * 255);
+    var g = Math.floor(Math.random() * 255);
+    var b = Math.floor(Math.random() * 255);
+    return "rgba(" + r + "," + g + "," + b + ", 0.2)"; 
+  }
+</script>
+{% endblock %}

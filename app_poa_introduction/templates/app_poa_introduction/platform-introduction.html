@@ -1,0 +1,119 @@
+{% extends 'base.html' %}
+{% block title %}賽馬娘輿情分析平台 — 平台介紹{% endblock %}
+{% block content %}
+<div class="col-lg-10 mx-auto">
+
+  <!-- 標題區 -->
+  <div class="text-center mb-5">
+    <h1 class="display-5 fw-bold">賽馬娘輿情分析平台</h1>
+    <p class="lead text-muted">Public Opinion Analysis Platform — Umamusume Pretty Derby</p>
+    <span class="badge bg-primary me-1">Django 5.2 LTS</span>
+    <span class="badge bg-success me-1">Gemini 3.5 Flash</span>
+    <span class="badge bg-dark me-1">Claude Sonnet 4.6</span>
+    <span class="badge bg-warning text-dark me-1">FAISS RAG</span>
+    <span class="badge bg-info text-dark">Docker</span>
+  </div>
+
+  <!-- 專案動機 -->
+  <div class="card mb-4">
+    <div class="card-header fw-bold">📌 專題動機</div>
+    <div class="card-body">
+      <p>
+        本平台以手機遊戲《賽馬娘 Pretty Derby》為主題，整合公眾輿論分析（POA）課程 w12–w16 的
+        核心技術，建立一套完整的遊戲社群輿情分析系統。
+      </p>
+      <p>
+        資料來源涵蓋 <strong>巴哈姆特馬娘版</strong>（bsn=34421）與
+        <strong>Bilibili BWIKI 官方公告</strong>，透過爬蟲、前處理、情感標記等完整 pipeline，
+        驅動前台的多種分析功能。
+      </p>
+      <p class="mb-0 text-muted small">
+        ⚠️ 本平台使用 AI 協助撰寫部分說明文字，並由人工審閱修正。
+      </p>
+    </div>
+  </div>
+
+  <!-- 功能一覽 -->
+  <div class="card mb-4">
+    <div class="card-header fw-bold">🎯 功能一覽</div>
+    <div class="card-body">
+      <div class="row g-3">
+        {% for name, desc in features %}
+        <div class="col-md-6">
+          <div class="d-flex align-items-start gap-2 p-2 border rounded">
+            <div>
+              <div class="fw-semibold">{{ name }}</div>
+              <div class="text-muted small">{{ desc }}</div>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- 技術架構 -->
+  <div class="card mb-4">
+    <div class="card-header fw-bold">🏗️ 技術架構</div>
+    <div class="card-body">
+      <table class="table table-sm table-hover">
+        <thead><tr><th>層次</th><th>採用技術</th></tr></thead>
+        <tbody>
+          {% for layer, tech in tech_stack %}
+          <tr><td>{{ layer }}</td><td><code>{{ tech }}</code></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <div class="mt-3 p-3 bg-light rounded font-monospace small">
+        Browser → Nginx → Gunicorn → Django → SQLite<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↑ Gemini 3.5 Flash / Claude Sonnet 4.6<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↑ FAISS Vector Index (RAG)<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↑ APScheduler（爬蟲 + 情感排程）
+      </div>
+    </div>
+  </div>
+
+  <!-- 資料來源 -->
+  <div class="card mb-4">
+    <div class="card-header fw-bold">📂 資料來源</div>
+    <div class="card-body">
+      <ul class="mb-0">
+        <li>
+          <strong>巴哈姆特馬娘哈啦板</strong>（bsn=34421）—
+          <a href="https://forum.gamer.com.tw/B.php?bsn=34421" target="_blank" rel="noopener">
+            forum.gamer.com.tw
+          </a>
+        </li>
+        <li>
+          <strong>Bilibili BWIKI 官方公告</strong> —
+          <a href="https://wiki.biligame.com/umamusume/" target="_blank" rel="noopener">
+            wiki.biligame.com/umamusume
+          </a>
+        </li>
+        <li>情感分析模型：<strong>Gemini 3.5 Flash</strong>（google-genai 2.9.0）</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 期末規範符合度 -->
+  <div class="card mb-4">
+    <div class="card-header fw-bold">✅ 期末規範符合度</div>
+    <div class="card-body">
+      <table class="table table-sm">
+        <thead><tr><th>要求</th><th>實作內容</th><th>狀態</th></tr></thead>
+        <tbody>
+          <tr><td>要求1：延續期中</td><td>以 w12 umamusume-llm-report 為基底</td><td><span class="badge bg-success">✓</span></td></tr>
+          <tr><td>要求2：自訂資料集</td><td>巴哈馬娘版 + Bilibili BWIKI</td><td><span class="badge bg-success">✓</span></td></tr>
+          <tr><td>要求3：Agentic AI</td><td>app_agent_uma（Gemini Function Calling）</td><td><span class="badge bg-success">✓</span></td></tr>
+          <tr><td>要求4：RAG</td><td>app_rag_uma（FAISS + gemini-embedding）</td><td><span class="badge bg-success">✓</span></td></tr>
+          <tr><td>要求5：Feature App</td><td>留言情感儀表板 + 角色 PK</td><td><span class="badge bg-success">✓</span></td></tr>
+          <tr><td>要求6：介紹頁</td><td>本頁（app_poa_introduction）</td><td><span class="badge bg-success">✓</span></td></tr>
+          <tr><td>要求8：LLM 分析</td><td>雙模型（Gemini 3.5 Flash / Claude Sonnet 4.6）</td><td><span class="badge bg-success">✓</span></td></tr>
+          <tr><td>部署：Docker</td><td>Nginx + Gunicorn + docker-compose.yml</td><td><span class="badge bg-success">✓</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>🏇 賽馬娘知識庫 RAG 問答</h2>
+    <p class="text-muted">上傳賽馬娘相關 PDF 文件（公告、攻略、角色介紹等），AI 將依據文件內容精準回答你的問題。</p>
+    <hr>
+    <div class="row">
+        <div class="col-md-5">
+            <div class="card mb-3">
+                <div class="card-header">上傳你的 PDF</div>
+                <div class="card-body">
+                    <form method="POST" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        <div class="form-group mb-3">
+                            <label for="pdfFile">選擇 PDF 檔案</label>
+                            <input type="file" class="form-control-file mt-2" id="pdfFile" name="pdf_file" accept=".pdf">
+                        </div>
+                        <button type="submit" name="action" value="upload" class="btn btn-primary">上傳並處理</button>
+                    </form>
+                    
+                    <form method="POST" class="mt-3">
+                        {% csrf_token %}
+                        <button type="submit" name="action" value="clear" class="btn btn-danger btn-sm" onclick="return confirm('確定要清空所有已上傳的向量與文件嗎？');">清空資料庫</button>
+                    </form>
+
+                    {% if upload_message %}
+                        <div class="alert alert-info mt-3">{{ upload_message }}</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-7">
+            <div class="card">
+                <div class="card-header">問答區</div>
+                <div class="card-body">
+                    <form method="POST">
+                        {% csrf_token %}
+
+                        <div class="mb-4">
+                            <h5>AI 回答：</h5>
+                            <div class="p-3 bg-light rounded text-dark border" style="min-height: 120px;">
+                                {% if answer %}
+                                    {{ answer|safe }}
+                                {% else %}
+                                    <span class="text-muted">請輸入問題後按送出，AI 回答會顯示在這裡。</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label for="query">詢問關於賽馬娘文件的問題</label>
+                            <input type="text" class="form-control mt-2" id="query" name="query" placeholder="請輸入您的問題..." required>
+                        </div>
+                        <button type="submit" name="action" value="query" class="btn btn-success" {% if not has_vectorstore %}disabled{% endif %}>送出問題</button>
+                        <div class="mb-3">
+                            <small class="text-muted text-primary font-weight-bold">【賽馬娘角色與劇情】範例問題：</small><br>
+                            <button type="button" class="btn btn-sm btn-outline-secondary mt-1" onclick="document.getElementById('query').value=this.innerText;">請介紹特別週這隻賽馬娘的背景故事與特色。</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary mt-1" onclick="document.getElementById('query').value=this.innerText;">東海帝皇和無敵艦隊之間有什麼特別的羈絆？</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary mt-1" onclick="document.getElementById('query').value=this.innerText;">黃金船的固有技能與歷史原型是什麼？</button>
+                            <br><br>
+                            <small class="text-muted text-success font-weight-bold">【遊戲機制與攻略】範例問題：</small><br>
+                            <button type="button" class="btn btn-sm btn-outline-secondary mt-1" onclick="document.getElementById('query').value=this.innerText;">賽馬娘的訓練模式有哪幾種？各自的特色是什麼？</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary mt-1" onclick="document.getElementById('query').value=this.innerText;">如何有效率地提升賽馬娘的速度與耐力屬性？</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary mt-1" onclick="document.getElementById('query').value=this.innerText;">支援卡的選擇對訓練結果有何影響？</button>
+                            <br><br>
+                            <small class="text-muted text-warning font-weight-bold">【活動與卡池資訊】範例問題：</small><br>
+                            <button type="button" class="btn btn-sm btn-outline-secondary mt-1" onclick="document.getElementById('query').value=this.innerText;">這份文件中提到哪些最新的限定卡池資訊？</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary mt-1" onclick="document.getElementById('query').value=this.innerText;">本次活動的主要獎勵內容與期間為何？</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary mt-1" onclick="document.getElementById('query').value=this.innerText;">這份公告中有哪些角色在此次活動中登場？</button>
+                        </div>
+                        {% if not has_vectorstore %}
+                            <small class="text-danger ml-2">請先上傳 PDF 檔案</small>
+                        {% endif %}
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="card mt-4">
+        <div class="card-header">RAG 概念與本 App 的運作說明</div>
+        <div class="card-body">
+            <p>這個 App 使用的是 <strong>RAG（Retrieval-Augmented Generation）</strong> 架構，也就是「先檢索文件，再產生回答」。這種方式非常適合用在多份非結構化文件，如賽馬娘角色介紹、活動公告 PDF、攻略手冊等。</p>
+            <p>本 App 的主要流程如下：</p>
+            <ol>
+                <li>上傳賽馬娘相關 PDF（例如：角色圖鑑、活動說明、版本更新公告），系統讀取內容並切成多個文本段落。</li>
+                <li>每個段落送到 Gemini Embedding 產生向量，保存在本地 FAISS 向量庫中。</li>
+                <li>查詢時，先把問題轉成向量，再在 FAISS 中檢索最相似的段落。</li>
+                <li>將檢索結果交給 Gemini 生成回答，讓 AI 根據你上傳的真實文件內容精準作答。</li>
+            </ol>
+            <p>目前支援「同時處理多份文件」，可對不同 PDF 進行交叉檢索與比較。</p>
+            <p><strong>App 的特色：</strong></p>
+            <ul>
+                <li>不是單純的聊天，而是把你上傳的文件「讀進來」再回答。</li>
+                <li>能同時記住多份文件，適合對多版本公告或多角色介紹進行比較提問。</li>
+                <li>實務情境：上傳多則卡池公告比對限定角色出現頻率、上傳攻略 PDF 詢問訓練策略差異。</li>
+            </ul>
+
+            <hr>
+            <h5>1. RAG 使用的理由、目的與情境</h5>
+            <p>
+                大型語言模型（LLM）雖然強大，但常面臨「幻覺（AI 本正經說瞎話）」、知識過時（無法得知訓練截斷日後的資訊）以及無法讀取企業私有數據等挑戰。
+                <strong>RAG 的核心目的</strong> 是賦予 AI 一個可以隨時擴充與更新的「外部大腦」，讓它在回答前先檢索準確的資料來源。
+                <strong>常見場景</strong> 包含：企業內部知識庫管理、專業法律或醫學合約比對、或是如本 App 所示的特定民調趨勢研究。
+            </p>
+
+            <h5>2. RAG 的技術組成</h5>
+            <p>一個完整的 RAG 系統通常包含以下關鍵技術環節：</p>
+            <ul>
+                <li><strong>文本切分 (Chunking)：</strong> 將長篇文件拆解為適當大小的片段，確保檢索的精確度與效率。</li>
+                <li><strong>嵌入模型 (Embedding Model)：</strong> 負責將文字轉化為電腦可運算的數學向量。</li>
+                <li><strong>向量存儲 (Vector Store)：</strong> 如本 App 使用的 FAISS，專門用於儲存並快速比對海量向量資料。</li>
+                <li><strong>檢索演算法 (Retrieval)：</strong> 根據相似度找出與問題最相關的文本片段。</li>
+                <li><strong>大語言模型 (LLM)：</strong> 接收檢索到的上下文，並生成具備事實根據的自然語言回答。</li>
+            </ul>
+
+            <h5>3. 深入了解「嵌入向量」（Embedding Vector）</h5>
+            <p>
+                <strong>定義：</strong> 嵌入向量是將人類語言轉化為「高維空間座標」的技術。簡單來說，就是把每一段話變成一串長長的數字（向量）。
+                <br><strong>核心價值：</strong> 不同於傳統關鍵字搜尋只能尋找「一模一樣的字」，向量搜尋是根據<strong>語意</strong>來比對。例如「房屋價格飆升」與「住宅成本增加」在字面上完全不同，但在向量空間中它們的距離會非常接近。這正是 RAG 能聰明地理解問題、並從文件中挖出「意思相符」而非僅僅是「字面相同」內容的核心秘密。
+            </p>
+
+            <div class="alert alert-secondary">
+                <strong>實例說明：</strong><br>
+                想像一個簡化版的 3 維向量空間（實際的 Gemini 模型通常高達 768 或 1536 維）：
+                <ul>
+                    <li>「國王」的座標可能是：<code>[0.9, 0.1, 0.5]</code></li>
+                    <li>「皇后」的座標可能是：<code>[0.9, 0.9, 0.5]</code></li>
+                    <li>「蘋果」的座標可能是：<code>[-0.2, 0.5, -0.8]</code></li>
+                </ul>
+                你會發現「國王」與「皇后」在第一維度（代表權力/地位）的數值非常接近，這就是為什麼電腦能判斷它們語意相關；而「蘋果」與它們的距離就非常遙遠。
+            </div>
+
+            <p><strong>這些模型是怎麼訓練的？</strong></p>
+            <p>
+                嵌入模型經歷了從早期 <strong>BERT</strong>（純編碼器架構）到現代 <strong>Gemini 1.5</strong>（基於大規模 Transformer 架構）的演進。
+                現代模型如 Gemini 是透過「深度學習」在海量多模態數據上訓練而成，其核心包含：
+                <br>1. <strong>預訓練知識：</strong> 模型先學習理解人類世界的語言邏輯與知識背景。
+                <br>2. <strong>對比學習 (Contrastive Learning)：</strong> 這是 RAG 關鍵技術。訓練時給模型成對的句子，告訴它哪些意思相近（應該在空間中拉近），哪些無關（應該推遠）。經過無數次迭代，模型最終能精確地將人類複雜的語言映射到精準的數學座標上。
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

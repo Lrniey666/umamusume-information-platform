@@ -1,0 +1,203 @@
+{% extends "app_crawler_admin/base_admin.html" %}
+{% block title %}YouTube API 管理{% endblock %}
+{% block nav_youtube %}active{% endblock %}
+
+{% block extra_css %}
+<style>
+  .quota-ring-wrap{display:flex;align-items:center;gap:24px;flex-wrap:wrap;}
+  .quota-ring-svg{width:120px;height:120px;flex-shrink:0;}
+  .quota-ring-text{text-align:center;}
+  .quota-ring-pct{font-size:26px;font-weight:700;color:var(--accent);}
+  .quota-ring-sub{font-size:11px;color:var(--muted);margin-top:2px;}
+
+  .video-thumb{width:80px;height:45px;object-fit:cover;border-radius:4px;background:var(--border);}
+  .sentiment-bar-wrap{width:80px;}
+  .sentiment-bar{height:5px;border-radius:3px;background:var(--border);overflow:hidden;}
+  .sentiment-fill-pos{height:100%;background:var(--positive);}
+  .sentiment-fill-neg{height:100%;background:var(--negative);}
+  .sentiment-fill-neu{height:100%;background:var(--warning);}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-row">
+    <div>
+      <h1>📺 YouTube API 管理</h1>
+      <p class="page-subtitle">YouTube Data API v3 配額監控 · 影片清單管理</p>
+    </div>
+    <div class="all-btn-row">
+      <button class="btn btn-accent btn-sm" id="crawlBtn" onclick="triggerCrawl()">▶ 手動爬取</button>
+      <button class="btn btn-outline-secondary btn-sm" onclick="loadData()">↻ 重新整理</button>
+    </div>
+  </div>
+</div>
+
+<!-- 統計卡片 -->
+<div class="stat-cards mb-3">
+  <div class="stat-card c-accent">
+    <div class="val">{{ yt_stats.total|default:0 }}</div>
+    <div class="lbl">YouTube 影片總數</div>
+  </div>
+  <div class="stat-card c-green">
+    <div class="val">{{ yt_stats.sentiment_avg|default:0 }}%</div>
+    <div class="lbl">平均情感分數</div>
+  </div>
+  <div class="stat-card {% if yt_stats.quota_pct >= 80 %}c-red{% elif yt_stats.quota_pct >= 50 %}c-orange{% else %}c-blue{% endif %}">
+    <div class="val">{{ yt_stats.quota_used|default:0 }}</div>
+    <div class="lbl">今日已用配額 / 10,000</div>
+  </div>
+</div>
+
+<!-- 配額詳細卡片 -->
+<div class="card mb-3">
+  <div class="card-header-bar">
+    <h5>⚡ 今日 API 配額使用</h5>
+    <span id="quotaRefreshTime" style="font-size:11px;color:var(--muted)"></span>
+  </div>
+  <div class="card-body">
+    <div class="quota-ring-wrap">
+      <div>
+        <svg class="quota-ring-svg" viewBox="0 0 36 36">
+          <circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--border)" stroke-width="3.5"/>
+          <circle id="quotaCircle" cx="18" cy="18" r="15.9" fill="none" stroke="var(--accent)"
+                  stroke-width="3.5" stroke-dasharray="0 100" stroke-dashoffset="25"
+                  stroke-linecap="round" style="transition:stroke-dasharray .6s;"/>
+        </svg>
+      </div>
+      <div class="quota-ring-text">
+        <div class="quota-ring-pct" id="quotaPct">{{ yt_stats.quota_pct|default:0 }}%</div>
+        <div class="quota-ring-sub"><span id="quotaUsed">{{ yt_stats.quota_used|default:0 }}</span> / 10,000 units</div>
+      </div>
+      <div style="flex:1;min-width:200px;">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">配額說明</div>
+        <div style="font-size:12px;line-height:1.8;">
+          <div>搜尋 1 次 = <strong>100</strong> units</div>
+          <div>影片詳情 50 筆 = <strong>50</strong> units</div>
+          <div>每 6 小時排程 ≈ <strong>500–700</strong> units</div>
+          <div>每日上限 = <strong>10,000</strong> units（免費）</div>
+        </div>
+      </div>
+    </div>
+    <div class="prog mt-3" style="height:8px;">
+      <div class="prog-bar {% if yt_stats.quota_pct >= 80 %}red{% else %}green{% endif %}"
+           id="quotaBar" style="width:{{ yt_stats.quota_pct|default:0 }}%"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 影片清單 -->
+<div class="card mb-3">
+  <div class="card-header-bar">
+    <h5>🎬 最近影片清單（前 20 筆）</h5>
+    <span style="font-size:11px;color:var(--muted)">依發布時間降序</span>
+  </div>
+  <div class="card-body p-0">
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>縮圖</th>
+            <th>標題</th>
+            <th>頻道</th>
+            <th>觀看數</th>
+            <th>情感分數</th>
+            <th>發布時間</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for v in yt_videos %}
+          <tr>
+            <td>
+              <a href="https://www.youtube.com/watch?v={{ v.video_id }}" target="_blank">
+                <img class="video-thumb"
+                     src="https://img.youtube.com/vi/{{ v.video_id }}/default.jpg"
+                     alt="{{ v.title|truncatechars:20 }}" loading="lazy">
+              </a>
+            </td>
+            <td style="max-width:280px;">
+              <a href="https://www.youtube.com/watch?v={{ v.video_id }}" target="_blank"
+                 style="color:var(--text);text-decoration:none;font-size:12px;">
+                {{ v.title|truncatechars:60 }}
+              </a>
+            </td>
+            <td style="font-size:12px;">{{ v.channel_name|default:"—" }}</td>
+            <td style="font-size:12px;">{{ v.view_count|default:0|filesizeformat }}</td>
+            <td>
+              {% if v.sentiment %}
+                {% if v.sentiment >= 0.6 %}
+                  <span class="pill pill-green">正面</span>
+                {% elif v.sentiment <= 0.4 %}
+                  <span class="pill pill-red">負面</span>
+                {% else %}
+                  <span class="pill pill-yellow">中性</span>
+                {% endif %}
+                <div class="sentiment-bar-wrap mt-1">
+                  <div class="sentiment-bar">
+                    <div class="sentiment-fill-pos" style="width:{{ v.sentiment|floatformat:2 }}%"></div>
+                  </div>
+                </div>
+              {% else %}
+                <span class="pill pill-gray">未標記</span>
+              {% endif %}
+            </td>
+            <td style="font-size:11px;color:var(--muted);">
+              {% if v.published_at %}{{ v.published_at|date:"Y-m-d" }}{% else %}—{% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted)">
+            尚無 YouTube 影片資料。請先執行爬取，或確認 YOUTUBE_API_KEY 已設定。
+          </td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- 操作說明 -->
+<div class="callout mb-2">
+  💡 <strong>APScheduler 排程</strong>：每 6 小時自動爬取（APScheduler）、每日 03:00 批次情感標記。
+  手動觸發僅爬取最多 20 部最新影片。
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function loadData(){
+  fetch('/crawler-admin/api/youtube_quota/')
+    .then(r=>r.json())
+    .then(d=>{
+      var pct = d.percent || 0;
+      document.getElementById('quotaPct').textContent = pct + '%';
+      document.getElementById('quotaUsed').textContent = d.units_used || 0;
+      var bar = document.getElementById('quotaBar');
+      if(bar){ bar.style.width = pct + '%'; }
+      var circle = document.getElementById('quotaCircle');
+      if(circle){ circle.setAttribute('stroke-dasharray', pct + ' ' + (100-pct)); }
+      var ts = document.getElementById('quotaRefreshTime');
+      if(ts){ ts.textContent = '更新於 ' + new Date().toLocaleTimeString('zh-TW'); }
+    }).catch(()=>{});
+}
+
+function triggerCrawl(){
+  var btn = document.getElementById('crawlBtn');
+  btn.disabled = true; btn.textContent = '爬取中…';
+  fetch('/crawler-admin/api/youtube_crawl/', {method:'POST', headers:{'X-CSRFToken': getCsrf()}})
+    .then(r=>r.json())
+    .then(d=>{
+      alert('YouTube 爬取已啟動（最多 20 部）。約 1 分鐘後重新整理頁面查看結果。');
+      btn.disabled = false; btn.textContent = '▶ 手動爬取';
+    }).catch(()=>{ btn.disabled = false; btn.textContent = '▶ 手動爬取'; });
+}
+
+function getCsrf(){
+  var m = document.cookie.match(/csrftoken=([^;]+)/);
+  return m ? m[1] : '';
+}
+
+$(function(){ loadData(); });
+</script>
+{% endblock %}

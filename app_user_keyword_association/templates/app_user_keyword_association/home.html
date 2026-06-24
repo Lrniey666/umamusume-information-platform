@@ -1,0 +1,295 @@
+{% extends 'base.html' %}
+{% load custom_filters %}
+{% block title %}全文檢索與關聯分析{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* 各卡片 body 設最大高度 + 捲動，避免單邊過長撐開整列 */
+  .assoc-scroll { max-height: 420px; overflow-y: auto; }
+  .assoc-cloud  { min-height: 220px; }
+
+  /* 關聯詞 pill 膠囊 */
+  .word-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: .28em .75em;
+    border-radius: 999px;
+    background: var(--color-accent-muted);
+    color: var(--color-accent);
+    font-size: .82rem;
+    font-weight: 600;
+    margin: 3px 2px;
+    line-height: 1.5;
+    transition: opacity .15s;
+  }
+  .word-pill:hover { opacity: .75; }
+  .word-pill .pill-count {
+    font-size: .72rem;
+    font-weight: 400;
+    opacity: .65;
+  }
+
+  /* 公告清單 */
+  #newslinks .list-group-item { font-size: .88rem; padding: .45rem .6rem; }
+
+  /* 段落清單 */
+  #same_paragraph .list-group-item { font-size: .85rem; line-height: 1.6; padding: .45rem .6rem; }
+
+  /* 總篇數 */
+  #num_articles { font-size: 1rem; margin-bottom: .5rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- 頁首 -->
+<div class="col-12 mb-1">
+  <h2 class="fw-bold mb-1" style="color:var(--color-text-primary);">賽馬娘公告全文檢索與關聯分析</h2>
+  <p class="mb-0" style="font-size:.85rem;color:var(--color-text-secondary);">
+    對你想了解的議題進行全文檢索，找出哪些詞彙與你的關鍵詞同時出現在遊戲公告中？
+  </p>
+</div>
+
+<!-- ── 第一列：輸入條件 + 文字雲 ───────────────────────── -->
+<div class="col-12">
+  <div class="row g-3 align-items-start">
+
+    <!-- 輸入條件 -->
+    <div class="col-lg-6">
+      <div class="card h-100">
+        <div class="card-header">
+          <h3 class="h6 text-uppercase mb-0">輸入條件</h3>
+        </div>
+        <div class="card-body">
+
+          <div class="row mb-3">
+            <label class="col-md-3 col-form-label">關心哪個關鍵詞?</label>
+            <div class="col-md-9">
+              <input id="input_keyword" name="userkey" value="限定 卡池" class="form-control" />
+              <div class="form-text">全文搜尋，可輸入多個詞，以空白隔開（角色名、活動名稱、遊戲詞彙皆可）。</div>
+            </div>
+          </div>
+
+          <div class="row mb-3">
+            <label class="col-sm-3 col-form-label">條件</label>
+            <div class="col-md-9">
+              <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio" value="and" name="condradio" id="condradio1" />
+                <label class="form-check-label" for="condradio1">and</label>
+              </div>
+              <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio" value="or" name="condradio" id="condradio2" checked />
+                <label class="form-check-label" for="condradio2">or</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="row mb-3">
+            <label class="col-sm-3 col-form-label">公告類別</label>
+            <div class="col-md-9">
+              {% for c in "全部,活動,卡池,競賽,系統,其他"|split:"," %}
+              <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio" value="{{ c }}" name="cateradio"
+                  id="cateradio_{{ c }}" {% if c == "全部" %}checked{% endif %} />
+                <label class="form-check-label" for="cateradio_{{ c }}">{{ c }}</label>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div class="row mb-3">
+            <label class="col-md-3 col-form-label">最近多少周?</label>
+            <div class="col-md-9">
+              {% for w in "1,2,3,4,6,8,12,52"|split:"," %}
+              <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio" value="{{ w }}" name="wkradio"
+                  id="wkradio{{ w }}" {% if w == "52" %}checked{% endif %} />
+                <label class="form-check-label" for="wkradio{{ w }}">{{ w }}</label>
+              </div>
+              {% endfor %}
+              <div class="form-text">以最新資料時間為準，往前推多少周？</div>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="col-md-9 ms-auto">
+              <button type="button" id="btn_ok" class="btn btn-primary">查詢</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- 文字雲 -->
+    <div class="col-lg-6">
+      <div class="card h-100">
+        <div class="card-header">
+          <h3 class="h6 text-uppercase mb-0">與它同時出現的詞彙（文字雲）</h3>
+        </div>
+        <div class="card-body assoc-cloud">
+          <div id="cloud"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── 第二列：公告清單 + 同時出現段落 ─────────────────── -->
+<div class="col-12">
+  <div class="row g-3 align-items-start">
+
+    <!-- 公告清單 -->
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <h3 class="h6 text-uppercase mb-0">相關遊戲公告清單（取前 15 篇）</h3>
+          <span id="num_articles"></span>
+        </div>
+        <div class="card-body assoc-scroll">
+          <ul class="list-group list-group-flush" id="newslinks"></ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- 同時出現段落 -->
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="h6 text-uppercase mb-0">關鍵字所在的公告段落（取前 10 段）</h3>
+        </div>
+        <div class="card-body assoc-scroll">
+          <ul class="list-group list-group-flush" id="same_paragraph"></ul>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── 第三列：關聯詞 pills ──────────────────────────── -->
+<div class="col-12">
+  <div class="row g-3">
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="h6 text-uppercase mb-0">與它同時出現的熱門詞彙</h3>
+        </div>
+        <div class="card-body">
+          <div id="related_words" style="line-height:2;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.4.11/d3.min.js"></script>
+<script src="https://cdn.rawgit.com/jasondavies/d3-cloud/v1.2.1/build/d3.layout.cloud.js"></script>
+<script>
+  call_ajax();
+
+  $("#btn_ok").on("click", call_ajax);
+  $("input[name='cateradio']").on("change", call_ajax);
+  $("input[name='wkradio']").on("change", call_ajax);
+  $("input[name='condradio']").on("change", call_ajax);
+
+  function call_ajax() {
+    const userkey = $("#input_keyword").val().trim();
+    const weeks   = $("input[name='wkradio']:checked").val();
+    const cate    = $("input[name='cateradio']:checked").val();
+    const cond    = $("input[name='condradio']:checked").val();
+
+    if (userkey.length < 2) {
+      alert("輸入關鍵字不可空白或小於兩個字！");
+      return;
+    }
+
+    $.ajax({
+      type: "POST",
+      url:  "api_get_userkey_associate/",
+      data: { userkey, cate, weeks, cond },
+      success: function (r) {
+        if (r.error) { alert("查詢回應：" + r.error); return; }
+
+        // 總篇數 badge
+        $("#num_articles").html(
+          `<span class="badge rounded-pill" style="background:var(--color-accent-muted);color:var(--color-accent);font-size:.78rem;">
+             共 ${r.num_articles} 篇
+           </span>`
+        );
+
+        // 公告清單
+        $("#newslinks").empty();
+        r.newslinks.forEach(function (item) {
+          const badge = `<span class="badge bg-secondary me-2 px-2 py-1" style="font-size:.68rem;">${item.category}</span>`;
+          const title = item.link
+            ? `<a href="${item.link}" target="_blank" rel="noopener" class="text-decoration-none">${item.title}</a>`
+            : item.title;
+          $("#newslinks").append(
+            `<li class="list-group-item py-2">${badge}${title}</li>`
+          );
+        });
+
+        // 同時出現段落
+        $("#same_paragraph").empty();
+        r.same_paragraph.forEach(function (p) {
+          $("#same_paragraph").append(
+            `<li class="list-group-item py-2">${p}</li>`
+          );
+        });
+
+        // 關聯詞 — pill 膠囊標籤
+        const $rw = $("#related_words").empty();
+        r.related_words.forEach(function (pair) {
+          $rw.append(
+            `<span class="word-pill">
+               ${pair[0]}<span class="pill-count">${pair[1]}</span>
+             </span>`
+          );
+        });
+
+        // 文字雲
+        $("#cloud").empty();
+        drawCloud(r.clouddata, "#cloud");
+      },
+      error: function () { alert("伺服器錯誤，請稍後再試。"); }
+    });
+  }
+
+  function drawCloud(words, el) {
+    if (!words || !words.length) return;
+    const W = 480, H = 380;
+    d3.layout.cloud()
+      .size([W, H])
+      .words(words)
+      .rotate(0)
+      .font("sans-serif")
+      .fontSize(function (d) { return d.size; })
+      .on("end", function (drawn) {
+        const fill = d3.scale.category20();
+        d3.select(el).append("svg")
+          .attr("width", "100%").attr("height", H)
+          .attr("viewBox", "0 0 " + W + " " + H)
+          .append("g")
+          .attr("transform", "translate(" + W/2 + "," + H/2 + ")")
+          .selectAll("text")
+          .data(drawn)
+          .enter().append("text")
+          .style("font-size",   function (d) { return d.size + "px"; })
+          .style("font-family", "sans-serif")
+          .style("fill",        function (d, i) { return fill(i); })
+          .attr("text-anchor",  "middle")
+          .attr("transform",    function (d) {
+            return "translate(" + [d.x, d.y] + ")rotate(" + d.rotate + ")";
+          })
+          .text(function (d) { return d.text; });
+      })
+      .start();
+  }
+</script>
+{% endblock %}

@@ -1,0 +1,342 @@
+{% extends 'base.html' %} {% block title %}
+  關鍵詞的情緒分析
+{% endblock %} {% block content %}
+  <div class="col-lg-12">
+    <h1>賽馬娘公告關鍵詞情緒分析</h1>
+    <p>了解各類遊戲公告對關鍵詞的情緒傾向</p>
+  </div>
+  <div class="col-lg-6 mb-2">
+    <!-- 輸入條件區塊開始 -->
+    <div class="card">
+      <div class="card-header">
+        <h3 class="h6 text-uppercase mb-0">輸入條件</h3>
+      </div>
+      <div class="card-body">
+        <div class="mb-3 row">
+          <label class="col-md-3 col-form-label">關心哪個關鍵詞?</label>
+          <div class="col-md-9">
+            <input id="input_keyword" name="userkey" value="限定" class="form-control" />
+            <div class="form-text">查找的關鍵字(或片段文字)，可輸入多個，空白隔開。</div>
+          </div>
+        </div>
+
+        <div class="mb-3 row">
+          <label class="col-sm-3 col-form-label">條件</label>
+
+          <div class="col-md-9">
+            <div class="form-check form-check-inline">
+              <input type="radio" value="and" name="condradio" id="cond-and" class="form-check-input" checked />
+              <label class="form-check-label" for="cond-and">and</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input type="radio" value="or" name="condradio" id="cond-or" class="form-check-input" />
+              <label class="form-check-label" for="cond-or">or</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="mb-3 row">
+          <label class="col-sm-3 col-form-label">公告類別</label>
+          <div class="col-md-9">
+            
+            <div class="form-check form-check-inline">
+              <input type="radio" value="全部" name="cateradio" id="cate-all" class="form-check-input" checked />
+              <label class="form-check-label" for="cate-all">全部</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input type="radio" value="活動" name="cateradio" id="cate-event" class="form-check-input" />
+              <label class="form-check-label" for="cate-event">活動</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input type="radio" value="卡池" name="cateradio" id="cate-gacha" class="form-check-input" />
+              <label class="form-check-label" for="cate-gacha">卡池</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input type="radio" value="競賽" name="cateradio" id="cate-race" class="form-check-input" />
+              <label class="form-check-label" for="cate-race">競賽</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input type="radio" value="系統" name="cateradio" id="cate-system" class="form-check-input" />
+              <label class="form-check-label" for="cate-system">系統</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input type="radio" value="其他" name="cateradio" id="cate-other" class="form-check-input" />
+              <label class="form-check-label" for="cate-other">其他</label>
+            </div></div>
+        </div>
+        <div class="mb-3 row">
+          <label class="col-md-3 col-form-label">最近多少周?</label>
+          <div class="col-md-9">
+            <div class="form-check form-check-inline">
+              <input type="radio" value="1" name="wkradio" id="week-1" class="form-check-input" />
+              <label class="form-check-label" for="week-1">1</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input type="radio" value="2" name="wkradio" id="week-2" class="form-check-input"  />
+              <label class="form-check-label" for="week-2">2</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input type="radio" value="3" name="wkradio" id="week-3" class="form-check-input" />
+              <label class="form-check-label" for="week-3">3</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input type="radio" value="4" name="wkradio" id="week-4" class="form-check-input" />
+              <label class="form-check-label" for="week-4">4</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input type="radio" value="6" name="wkradio" id="week-6" class="form-check-input" />
+              <label class="form-check-label" for="week-6">6</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input type="radio" value="8" name="wkradio" id="week-8" class="form-check-input" />
+              <label class="form-check-label" for="week-8">8</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input type="radio" value="12" name="wkradio" id="week-12" class="form-check-input" />
+              <label class="form-check-label" for="week-12">12</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" id="wk52" value="52" name="wkradio" checked />
+              <label class="form-check-label" for="wk52">52</label>
+            </div>
+            <div class="form-text">以最新資料時間為準，往前推多少周?</div>
+          </div>
+        </div>
+        <div class="mb-3 row">
+          <label class="col-sm-3 col-form-label">資料來源</label>
+          <div class="col-md-9">
+            <select id="select_source" class="form-select form-select-sm" style="max-width:200px">
+              <option value="all">全部來源</option>
+              <option value="bilibili">Bilibili BWIKI</option>
+              <option value="bahamut">巴哈姆特</option>
+              <option value="udn">聯合新聞網</option>
+              <option value="ettoday">ETtoday</option>
+              <option value="gamme">宅宅新聞</option>
+            </select>
+          </div>
+        </div>
+        <div class="mb-3 row">
+          <div class="col-md-9 ms-auto">
+            <button type="button" id="btn_ok" class="btn btn-primary">查詢</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- 輸入區塊結束 -->
+
+  <!-- 顯示區塊 -->
+  <div class="col-lg-6 mb-5">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="h6 text-uppercase mb-0">情緒分析:文章層級</h3>
+      </div>
+      <div class="card-body">
+        <div class="row">
+          <canvas id="article_senti_pie_chart"></canvas>
+        </div>
+        <div>
+          <ul id="senti_info" class="list-unstyled d-flex flex-wrap justify-content-center gap-3 mt-4"></ul>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- 區塊結束 -->
+
+  <!-- 顯示區塊 -->
+  <div class="col-lg-6 mb-5">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="h6 text-uppercase mb-0">正反面情緒變化</h3>
+      </div>
+      <div class="card-body">
+        <small>每個時間點的正反面公告的篇數(每天統計，6周含以上以5天為單位統計)</small>
+        <div class="row">
+          <canvas id="time_line_chart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- 區塊結束 -->
+{% endblock %} {% block extra_js %}
+  <!-- java scrip通常寫在網頁最後面，等頁面初始化之後才會執行 -->
+  <!-- chartjs圖js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.13.0/moment.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.3/Chart.min.js"></script>
+  <!-- 程式碼區 -->
+  <script>
+    call_ajax()
+    
+    //**按鈕事件
+    $('#btn_ok').on('click', function () {
+      call_ajax()
+    }) //event function
+    
+    $("input[name='cateradio']").on('change', function () {
+      call_ajax()
+    }) //event function
+    
+    $("input[name='wkradio']").on('change', function () {
+      call_ajax()
+    }) //event function
+    
+    $("input[name='condradio']").on('change', function () {
+      call_ajax()
+    }) //event function
+    
+    // Draw the sentiment line chart here!
+    let linechartElem = document.getElementById('time_line_chart').getContext('2d')
+    //let linechart = null;
+    
+    // pie chart
+    let piechartElem = document.getElementById('article_senti_pie_chart').getContext('2d')
+    
+    // Ajax function to draw charts
+    function call_ajax() {
+      const userkey = $('#input_keyword').val()
+      const weeks = $("input[name='wkradio']:checked").val()
+      const cate = $("input[name='cateradio']:checked").val()
+      const cond = $("input[name='condradio']:checked").val()
+    
+      if (userkey.length < 2) {
+        alert('輸入關鍵字不可空白或小於兩個中文字!')
+        return 0
+      }
+    
+      $.ajax({
+        type: 'POST',
+
+        //(1)本地端API
+        url: 'api_get_userkey_sentiment/',
+
+        //(2)透過後端呼叫遠端API
+        //url: 'api_get_userkey_sentiment_from_remote_api_through_backend/',
+        
+        //(3)由前端呼叫選端API
+        //url: "http://163.18.23.20:8000/userkeyword_senti/api_get_userkey_sentiment/",
+        
+        data: {
+          userkey: userkey,
+          cate:    cate,
+          weeks:   weeks,
+          cond:    cond,
+          source:  $('#select_source').val(),
+        }, // pass to server
+        success: function (received) {
+
+        //若查無資料，顯示提醒訊息
+        if (received["error"]) {
+          alert("檢索異常回應: " + received["error"]);
+          return 0;
+        }
+
+          // draw pie chart
+          const data_pie = received['sentiCount']
+          // 先清除前一個圖形
+          if (window.piechart) piechart.destroy()
+          // 畫圓餅圖函數寫法，前面不要加修飾語const, let, var
+          piechart = drawPieChart(piechartElem, data_pie)
+    
+          $('#senti_info').empty()
+          for (let k in data_pie) {
+            $('#senti_info').append(`<li class="badge bg-warning text-dark">${k}: ${data_pie[k]}篇</li>`)
+          }
+    
+          // draw time-based line chart
+          const data_pos = received['data_pos']
+          const data_neg = received['data_neg']
+    
+          // 先清除前一個圖形
+          if (window.linechart) linechart.destroy()
+          // 畫線圖 全域變數linechart 前面不要用const, let, var
+          linechart = drawLineChart(linechartElem, data_pos, data_neg)
+        } //success function
+      }) //ajax
+    } //function call_ajax()
+    
+    // PieChart function寫法
+    function drawPieChart(chartElem, chartdata) {
+      let chartSpec = {
+        type: 'pie',
+        data: {
+          labels: ['正面', '負面', '中立'],
+          datasets: [
+            {
+              data: [chartdata.Positive, chartdata.Negative, chartdata.Neutral],
+              backgroundColor: ['rgba(0,0,255,0.3)', 'rgba(255,0,0,0.3)', 'rgba(150,150,150,0.3)']
+            }
+          ]
+        },
+        options: {}
+      }
+      return new Chart(chartElem, chartSpec)
+    }
+    
+    // Line chart function
+    function drawLineChart(linechartElem, data_pos, data_neg) {
+      // for positive sentiment line chart
+      let dataPos = {
+        label: '正面',
+        data: data_pos,
+        borderColor: 'rgba(0,0,255,0.3)', //"blue", //藍色表示正面
+        backgroundColor: 'rgba(0,0,255,0.2)', //背景顏色
+        borderWidth: 1,
+        fill: true
+      }
+      // for negative sentiment line chart
+      let dataNeg = {
+        label: '負面',
+        data: data_neg,
+        borderColor: 'rgba(255,0,0,0.3)', //"red", //紅色表示負面
+        backgroundColor: 'rgba(255,0,0,0.2)', //背景顏色
+        borderWidth: 1,
+        fill: true
+      }
+    
+      let options_detail = {
+        legend: {
+          display: true
+        },
+        scales: {
+          xAxes: [
+            {
+              type: 'time',
+              time: {
+                unit: 'day',
+                displayFormats: {
+                  //day: 'DD-MM-YYYY'
+                  day: 'MM/DD'
+                }
+              }
+            }
+          ],
+          yAxes: [
+            {
+              ticks: {
+                beginAtZero: true
+              },
+              display: true,
+              scaleLabel: {
+                display: true,
+                labelString: '篇數'
+              }
+            }
+          ]
+        }
+      }
+    
+      let chart_spec = {
+        type: 'line',
+        data: {
+          datasets: [dataPos, dataNeg] //有兩條線，兩組資料使用陣列存放即可
+        },
+        options: options_detail
+      }
+    
+      // now draw the sentiment line chart
+      //if (linechart)
+      //    linechart.destroy();
+      return new Chart(linechartElem, chart_spec)
+    }
+  </script>
+{% endblock %}

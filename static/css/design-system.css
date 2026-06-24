@@ -1,0 +1,1044 @@
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+  --color-bg-base: #f6f4fc;
+  --color-bg-surface: rgba(255, 255, 255, 0.78);
+  --color-bg-elevated: rgba(255, 255, 255, 0.92);
+  --color-border: rgba(109, 40, 217, 0.2);
+  --color-text-primary: #1c1530;
+  --color-text-secondary: #5c5470;
+  --color-text-disabled: #948aa8;
+  --color-accent: #6d28d9;
+  --color-accent-soft: #ede9ff;
+  --color-gold: #b8902b;
+  --color-gold-soft: #f7e4ae;
+  --color-positive: #2e9e6b;
+  --color-negative: #d9503f;
+  --color-navbar-bg: rgba(248, 245, 255, 0.82);
+  --color-shadow-sm: rgba(35, 25, 60, 0.08);
+  --color-shadow-md: rgba(35, 25, 60, 0.13);
+  --color-shadow-lg: rgba(35, 25, 60, 0.2);
+  --color-glow-purple: rgba(124, 58, 237, 0.45);
+  --color-glow-gold: rgba(212, 175, 55, 0.55);
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-pill: 999px;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --color-bg-base: #0f0b1a;
+  --color-bg-surface: rgba(29, 24, 44, 0.65);
+  --color-bg-elevated: rgba(36, 30, 54, 0.82);
+  --color-border: rgba(196, 181, 253, 0.2);
+  --color-text-primary: #f1ecfb;
+  --color-text-secondary: #b3a9cc;
+  --color-text-disabled: #807793;
+  --color-accent: #a78bfa;
+  --color-accent-soft: #241a40;
+  --color-gold: #e8c765;
+  --color-gold-soft: #5a4a21;
+  --color-positive: #4cc28a;
+  --color-negative: #f07060;
+  --color-navbar-bg: rgba(22, 17, 34, 0.76);
+  --color-shadow-sm: rgba(0, 0, 0, 0.3);
+  --color-shadow-md: rgba(0, 0, 0, 0.44);
+  --color-shadow-lg: rgba(0, 0, 0, 0.58);
+  --color-glow-purple: rgba(167, 139, 250, 0.45);
+  --color-glow-gold: rgba(232, 199, 101, 0.45);
+}
+
+/* ──────────────────────────────────────────────────────────────
+   簡寫變數別名 → 對應主題化長變數 (--color-*)
+   情報站控制台 (app_crawler_admin) 各頁沿用設計原型的簡寫命名
+   (--text, --muted, --accent, --surface, --bg, --card-bg, --border,
+   --accent-muted, --positive, --negative, --warning…)，但這些名稱先前
+   未在 design-system.css 定義，導致深色主題切換時，使用這些變數的
+   文字 / 背景顏色無法隨主題改變（深色主題下文字仍偏暗、卡片背景透明）。
+   下列別名引用會隨 [data-theme] 切換的 --color-* 長變數，
+   因此自動具備亮 / 暗主題反應性，無需重複定義 dark 版本。
+   ────────────────────────────────────────────────────────────── */
+:root {
+  --bg: var(--color-bg-base);
+  --surface: var(--color-bg-surface);
+  --card: var(--color-bg-surface);
+  --card-bg: var(--color-bg-surface);
+  --elevated: var(--color-bg-elevated);
+  --border: var(--color-border);
+  --text: var(--color-text-primary);
+  --muted: var(--color-text-secondary);
+  --disabled: var(--color-text-disabled);
+  --accent: var(--color-accent);
+  --accent-muted: var(--color-accent-soft);
+  --accent-soft: var(--color-accent-soft);
+  --positive: var(--color-positive);
+  --negative: var(--color-negative);
+  --warning: var(--color-gold);
+  --gold: var(--color-gold);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body.ui-modern {
+  background: var(--color-bg-base);
+  color: var(--color-text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", sans-serif;
+  transition: background-color 0.3s ease, color 0.2s ease;
+}
+
+.mesh-bg {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -2;
+  opacity: 0.95;
+  background:
+    radial-gradient(circle at 18% 22%, rgba(167, 139, 250, 0.34), transparent 42%),
+    radial-gradient(circle at 82% 24%, rgba(109, 40, 217, 0.28), transparent 46%),
+    radial-gradient(circle at 72% 78%, rgba(212, 175, 55, 0.2), transparent 36%),
+    radial-gradient(circle at 24% 74%, rgba(255, 255, 255, 0.5), transparent 38%);
+  animation: mesh-drift 36s ease-in-out infinite alternate;
+}
+
+[data-theme="dark"] .mesh-bg {
+  opacity: 0.7;
+}
+
+@keyframes mesh-drift {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  100% {
+    transform: translate3d(-2%, 2%, 0) scale(1.08);
+  }
+}
+
+@keyframes breathe-gold {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(0, 0, 0, 0), 0 0 8px 0 var(--color-glow-gold);
+  }
+  50% {
+    box-shadow: 0 0 0 0 rgba(0, 0, 0, 0), 0 0 20px 4px var(--color-glow-gold);
+  }
+}
+
+@keyframes breathe-purple {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(0, 0, 0, 0), 0 0 8px 0 var(--color-glow-purple);
+  }
+  50% {
+    box-shadow: 0 0 0 0 rgba(0, 0, 0, 0), 0 0 18px 4px var(--color-glow-purple);
+  }
+}
+
+@keyframes chart-popin {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes page-fadein {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.glass-surface,
+.navbar,
+.site-footer,
+.sidebar,
+.card,
+.dropdown-menu,
+.modal-content {
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: 0 8px 32px var(--color-shadow-sm);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+}
+
+.card {
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.25s ease, border-color 0.2s ease;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px var(--color-shadow-md), 0 0 14px var(--color-glow-purple);
+}
+
+.card-header {
+  background: transparent;
+  border-bottom-color: var(--color-border);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.text-dark {
+  color: var(--color-text-primary) !important;
+}
+
+.text-muted {
+  color: var(--color-text-secondary) !important;
+}
+
+a {
+  color: var(--color-accent);
+  text-decoration-thickness: 1px;
+}
+
+a:hover {
+  color: color-mix(in srgb, var(--color-accent) 75%, #ffffff 25%);
+}
+
+.btn {
+  border-radius: 12px;
+  transition: transform 0.16s ease, box-shadow 0.25s ease, filter 0.2s ease;
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn-primary,
+.btn-accent {
+  color: #fff;
+  border-color: var(--color-accent);
+  background: linear-gradient(135deg, var(--color-accent), color-mix(in srgb, var(--color-accent) 75%, #ffffff 25%));
+}
+
+.btn-primary:hover,
+.btn-primary:focus,
+.btn-accent:hover,
+.btn-accent:focus {
+  color: #fff;
+  filter: brightness(1.06);
+  animation: breathe-gold 1.1s ease-in-out infinite;
+}
+
+.btn-success {
+  border-color: var(--color-positive);
+  background: linear-gradient(135deg, var(--color-positive), color-mix(in srgb, var(--color-positive) 70%, #ffffff 30%));
+}
+
+.btn-success:hover,
+.btn-success:focus {
+  animation: breathe-purple 1.15s ease-in-out infinite;
+}
+
+.btn-query-ready {
+  animation: breathe-gold 1.1s ease-in-out infinite;
+}
+
+.form-label {
+  color: var(--color-text-secondary);
+  font-weight: 600;
+}
+
+.form-text,
+.form-check-label,
+small.text-muted {
+  color: var(--color-text-secondary) !important;
+}
+
+.form-control,
+.form-select {
+  border-radius: 12px;
+  color: var(--color-text-primary);
+  border-color: var(--color-border);
+  background: var(--color-bg-elevated);
+}
+
+.form-control::placeholder {
+  color: var(--color-text-disabled);
+}
+
+.form-control:focus,
+.form-select:focus {
+  color: var(--color-text-primary);
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 28%, transparent);
+  background: var(--color-bg-elevated);
+}
+
+.form-check-input:checked {
+  background-color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.navbar {
+  border-radius: var(--radius-lg);
+  padding: 0.65rem 0.8rem;
+}
+
+.navbar-brand {
+  color: var(--color-text-primary) !important;
+  letter-spacing: 0.015em;
+}
+
+.navbar .btn,
+.navbar .nav-link {
+  color: var(--color-text-primary);
+  font-weight: 500;
+}
+
+.navbar .btn:hover,
+.navbar .nav-link:hover {
+  color: var(--color-accent);
+}
+
+.navbar-toggler {
+  border-color: var(--color-border);
+}
+
+.navbar-toggler-icon {
+  background-image: none;
+  width: 1.35rem;
+  height: 1.35rem;
+  display: inline-block;
+  background:
+    linear-gradient(var(--color-text-primary), var(--color-text-primary)) center 30% / 100% 2px no-repeat,
+    linear-gradient(var(--color-text-primary), var(--color-text-primary)) center 50% / 100% 2px no-repeat,
+    linear-gradient(var(--color-text-primary), var(--color-text-primary)) center 70% / 100% 2px no-repeat;
+}
+
+.dropdown-menu {
+  border-radius: 14px;
+  min-width: 260px;
+}
+
+/* 下拉選單底色：較不透明以利閱讀（想微調就改下面 0.97 這個 alpha） */
+[data-theme="light"] .dropdown-menu {
+  background: rgba(255, 255, 255, 0.99);
+}
+
+[data-theme="dark"] .dropdown-menu {
+  background: rgba(33, 27, 50, 0.99);
+}
+
+.dropdown-item {
+  color: var(--color-text-primary);
+  border-radius: 8px;
+  margin: 0.1rem 0.3rem;
+  padding: 0.45rem 0.65rem;
+}
+
+.dropdown-item:hover,
+.dropdown-item:focus {
+  color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent-soft) 72%, transparent);
+}
+
+#themeToggleBtn,
+#themeBtn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  color: var(--color-accent);
+  background: var(--color-bg-elevated);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.05rem;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, color 0.2s ease;
+}
+
+#themeToggleBtn:hover,
+#themeBtn:hover {
+  transform: scale(1.08);
+  animation: breathe-gold 0.9s ease-in-out infinite;
+}
+
+#themeToggleBtn:focus-visible,
+#themeBtn:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+/* 控制台主題鈕：置於側欄底部（隨 flex 流），避免覆蓋主內容操作按鈕 */
+.admin-shell .sidebar #themeBtn {
+  margin: auto 0 0 0.3rem;
+}
+
+.site-shell #pageContent,
+.admin-shell .main {
+  animation: page-fadein 0.38s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.site-footer {
+  border-radius: 24px 24px 0 0;
+  border-bottom: 0;
+  margin-top: 3rem;
+  padding: 1.8rem 0 1.2rem;
+}
+
+.site-footer .footer-brand {
+  color: var(--color-text-primary);
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.site-footer .footer-tagline,
+.site-footer .footer-bottom-left,
+.site-footer .footer-bottom-right {
+  color: var(--color-text-secondary);
+}
+
+.footer-source-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+}
+
+.footer-source-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.36rem;
+  color: var(--color-text-secondary);
+  font-size: 0.83rem;
+}
+
+.footer-source-badge {
+  background: color-mix(in srgb, var(--color-accent-soft) 68%, transparent);
+  color: var(--color-accent);
+  border-radius: var(--radius-pill);
+  padding: 1px 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.footer-divider {
+  border-top-color: var(--color-border);
+}
+
+.table,
+table {
+  color: var(--color-text-primary);
+  border-color: var(--color-border);
+}
+
+.table thead th,
+table thead th {
+  border-bottom-color: var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.table td,
+.table th,
+table td,
+table th {
+  padding: 0.68rem 0.72rem;
+  vertical-align: middle;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.table-responsive,
+.tbl-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.chart-wrapper {
+  position: relative;
+  min-height: 180px;
+}
+
+.chart-skeleton {
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-border) 80%, transparent);
+  animation: breathe-purple 1.25s ease-in-out infinite;
+}
+
+.empty-state {
+  color: var(--color-text-secondary);
+}
+
+.admin-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.sidebar {
+  width: 250px;
+  border-right: 1px solid var(--color-border);
+  padding: 1.2rem 0.95rem 1rem;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-brand {
+  padding: 0.1rem 0.68rem 0.85rem;
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: 0.7rem;
+}
+
+.sidebar-brand a {
+  color: var(--color-accent);
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.sidebar-brand .back-link {
+  display: block;
+  margin-top: 0.35rem;
+  color: var(--color-text-secondary);
+  font-size: 0.8rem;
+}
+
+.sidebar-section {
+  padding: 0.65rem 0.65rem 0.32rem;
+  color: var(--color-text-disabled);
+  text-transform: uppercase;
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+}
+
+.sidebar-nav {
+  list-style: none;
+  margin: 0;
+  padding: 0 0.35rem;
+}
+
+.sidebar-nav li {
+  margin-bottom: 0.24rem;
+}
+
+.sidebar-nav li a {
+  display: flex;
+  align-items: center;
+  gap: 0.48rem;
+  border-radius: 10px;
+  padding: 0.45rem 0.62rem;
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.sidebar-nav li a:hover,
+.sidebar-nav li a.active {
+  color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent-soft) 72%, transparent);
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  padding: 1.6rem 2rem 2.2rem;
+}
+
+.page-header {
+  margin-bottom: 1.2rem;
+}
+
+.page-header h1 {
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.page-subtitle {
+  font-size: 0.84rem;
+  color: var(--color-text-secondary);
+}
+
+.page-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.card-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.72rem 0.95rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.card-header-bar h5 {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.sidebar-nav .nav-icon {
+  width: 1rem;
+  text-align: center;
+  font-size: 0.82rem;
+}
+
+.stat-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem;
+}
+
+.stat-card {
+  min-width: 120px;
+  flex: 1;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-surface);
+  backdrop-filter: blur(10px);
+  padding: 0.75rem 0.95rem;
+  box-shadow: 0 8px 24px var(--color-shadow-sm);
+}
+
+.stat-card .val {
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.stat-card .lbl {
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+}
+
+.pill {
+  display: inline-block;
+  font-size: 0.72rem;
+  padding: 2px 9px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border);
+}
+
+.pill-accent {
+  color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent-soft) 68%, transparent);
+}
+
+.pill-green {
+  color: var(--color-positive);
+  background: color-mix(in srgb, var(--color-positive) 15%, transparent);
+}
+
+.pill-red {
+  color: var(--color-negative);
+  background: color-mix(in srgb, var(--color-negative) 14%, transparent);
+}
+
+.pill-blue {
+  color: #387de3;
+  background: color-mix(in srgb, #387de3 12%, transparent);
+}
+
+.pill-yellow {
+  color: var(--color-gold);
+  background: color-mix(in srgb, var(--color-gold) 14%, transparent);
+}
+
+.pill-gray {
+  color: var(--color-text-secondary);
+  background: color-mix(in srgb, var(--color-text-secondary) 10%, transparent);
+}
+
+.log-panel {
+  border-radius: 12px;
+  background: #0f1420;
+  color: #d2d9e8;
+  padding: 0.7rem 0.85rem;
+  font-size: 0.76rem;
+  line-height: 1.7;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+.callout {
+  border-left: 3px solid #387de3;
+  border-radius: 8px;
+  background: color-mix(in srgb, #387de3 12%, transparent);
+  padding: 0.58rem 0.8rem;
+}
+
+.prog {
+  height: 7px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--color-border) 70%, transparent);
+}
+
+.prog-bar {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--color-accent), var(--color-gold));
+}
+
+.prog-bar.green {
+  background: linear-gradient(90deg, var(--color-positive), color-mix(in srgb, var(--color-positive) 70%, #ffffff 30%));
+}
+
+@media (max-width: 992px) {
+  .sidebar {
+    width: 100%;
+    height: auto;
+    position: relative;
+    border-right: 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .admin-shell {
+    flex-direction: column;
+  }
+
+  .main {
+    padding: 1rem;
+  }
+}
+
+/* ============================================================
+   Bootstrap 工具類主題覆寫 — 修正暗色模式下看不清的硬色文字
+   ============================================================ */
+.text-dark,
+.text-black,
+.text-body,
+.text-body-emphasis {
+  color: var(--color-text-primary) !important;
+}
+
+.text-secondary,
+.text-body-secondary {
+  color: var(--color-text-secondary) !important;
+}
+
+.text-primary {
+  color: var(--color-accent) !important;
+}
+
+.bg-white,
+.bg-light,
+.bg-body,
+.bg-body-tertiary,
+.bg-body-secondary {
+  background-color: var(--color-bg-surface) !important;
+  color: var(--color-text-primary);
+}
+
+.border,
+.border-top,
+.border-bottom,
+.border-start,
+.border-end {
+  border-color: var(--color-border) !important;
+}
+
+hr {
+  border-color: var(--color-border);
+  opacity: 0.5;
+}
+
+.table {
+  --bs-table-bg: transparent;
+  --bs-table-color: var(--color-text-primary);
+  --bs-table-striped-bg: color-mix(in srgb, var(--color-accent-soft) 35%, transparent);
+  --bs-table-striped-color: var(--color-text-primary);
+  --bs-table-hover-bg: color-mix(in srgb, var(--color-accent-soft) 55%, transparent);
+  --bs-table-hover-color: var(--color-text-primary);
+  color: var(--color-text-primary);
+}
+
+.table-light,
+.table > thead {
+  --bs-table-bg: color-mix(in srgb, var(--color-accent-soft) 45%, transparent);
+  --bs-table-color: var(--color-text-secondary);
+}
+
+.list-group-item {
+  background: var(--color-bg-surface);
+  color: var(--color-text-primary);
+  border-color: var(--color-border);
+}
+
+.input-group-text {
+  background: var(--color-accent-soft);
+  border-color: var(--color-border);
+  color: var(--color-text-secondary);
+}
+
+.modal-header,
+.modal-footer {
+  border-color: var(--color-border);
+}
+
+.nav-tabs {
+  border-bottom-color: var(--color-border);
+}
+
+.nav-tabs .nav-link {
+  color: var(--color-text-secondary);
+}
+
+.nav-tabs .nav-link.active {
+  color: var(--color-accent);
+  background: var(--color-bg-surface);
+  border-color: var(--color-border) var(--color-border) var(--color-bg-surface);
+}
+
+kbd {
+  background: var(--color-text-primary);
+  color: var(--color-bg-surface);
+  border-radius: 5px;
+}
+
+[data-theme="dark"] .btn-close {
+  filter: invert(1) grayscale(100%) brightness(200%);
+}
+
+.btn-outline-secondary {
+  color: var(--color-text-secondary);
+  border-color: var(--color-border);
+}
+
+.btn-outline-secondary:hover {
+  color: #fff;
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.btn-outline-primary {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.btn-outline-primary:hover {
+  color: #fff;
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.spinner-border {
+  color: var(--color-accent);
+}
+
+/* ============================================================
+   全寬導覽列：背景滿版、內容置中、文字較小
+   ============================================================ */
+.site-nav {
+  position: sticky;
+  top: 0;
+  z-index: 1031;
+  width: 100%;
+  background: var(--color-navbar-bg);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  border-bottom: 1px solid var(--color-border);
+  box-shadow: 0 4px 20px var(--color-shadow-sm);
+}
+
+.site-nav .navbar {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  padding: 0.3rem 0;
+}
+
+.site-nav .navbar-brand {
+  font-size: 0.98rem;
+  font-weight: 700;
+}
+
+.site-nav .navbar-nav .nav-link,
+.site-nav .navbar .btn.dropdown-toggle {
+  font-size: 0.82rem;
+  font-weight: 500;
+  padding: 0.34rem 0.62rem;
+  border-radius: 9px;
+}
+
+.site-nav .navbar-nav .nav-link:hover,
+.site-nav .navbar .btn.dropdown-toggle:hover {
+  background: color-mix(in srgb, var(--color-accent-soft) 60%, transparent);
+  color: var(--color-accent);
+}
+
+.site-nav .dropdown-menu {
+  font-size: 0.84rem;
+}
+
+/* 導覽列搜尋 */
+.nav-search {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  padding: 0.12rem 0.3rem 0.12rem 0.7rem;
+  background: var(--color-bg-elevated);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, max-width 0.3s ease;
+}
+
+.nav-search:focus-within {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 22%, transparent);
+}
+
+.nav-search input {
+  border: 0;
+  background: transparent;
+  outline: none;
+  color: var(--color-text-primary);
+  font-size: 0.82rem;
+  width: 8.5rem;
+  min-width: 0;
+}
+
+.nav-search input::placeholder {
+  color: var(--color-text-disabled);
+}
+
+.nav-search button {
+  border: 0;
+  background: transparent;
+  color: var(--color-accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background 0.18s ease;
+}
+
+.nav-search button:hover {
+  background: color-mix(in srgb, var(--color-accent-soft) 70%, transparent);
+}
+
+.nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* ============================================================
+   下拉選單滑入 + 淡入（絲滑）
+   ============================================================ */
+.dropdown-menu {
+  display: block;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-8px) scale(0.98);
+  transform-origin: top center;
+  transition: opacity 0.2s ease, transform 0.22s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+    visibility 0.22s;
+  pointer-events: none;
+}
+
+.dropdown-menu.show {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+/* ============================================================
+   蘋果風捲動顯示（滑入 + 淡入）
+   以選擇器在「首次繪製前」就隱藏區塊（reveal-ready 由 <head> 內聯腳本
+   在繪製前加到 <html>），避免「先顯示→淡出→再淡入」的閃爍，做到從無到有。
+   僅套用前台 #pageContent，控制台不使用區塊淡入。
+   ============================================================ */
+html.reveal-ready #pageContent > [class*="col-"] {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.7s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+    transform 0.7s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  will-change: opacity, transform;
+}
+
+html.reveal-ready #pageContent > [class*="col-"].in-view {
+  opacity: 1;
+  transform: none;
+}
+
+/* ============================================================
+   圖表容器：固定高度避免大塊圖配小字、避免擠壓
+   ============================================================ */
+.chart-fixed {
+  position: relative;
+  width: 100%;
+  height: 320px;
+}
+
+.chart-fixed.chart-tall {
+  height: 380px;
+}
+
+.chart-fixed canvas {
+  max-width: 100%;
+}
+
+.chart-wrapper {
+  min-height: 240px;
+}
+
+@media (max-width: 992px) {
+  .chart-fixed {
+    height: 280px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .mesh-bg {
+    animation: none !important;
+  }
+
+  html.reveal-ready #pageContent > [class*="col-"] {
+    opacity: 1;
+    transform: none;
+  }
+}

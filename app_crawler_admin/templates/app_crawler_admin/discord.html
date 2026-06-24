@@ -1,0 +1,1690 @@
+{% extends "app_crawler_admin/base_admin.html" %}
+{% block title %}Discord Bot 管理{% endblock %}
+{% block nav_discord %}active{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* ── Status indicator ── */
+  .bot-status-dot {
+    display: inline-block; width: 10px; height: 10px; border-radius: 50%;
+    background: #6b7280; margin-right: 6px;
+    box-shadow: 0 0 0 2px rgba(107,114,128,.25);
+    animation: pulse-gray 2s infinite;
+  }
+  .bot-status-dot.online  { background: #22c55e; box-shadow: 0 0 0 2px rgba(34,197,94,.25); animation: pulse-green 2s infinite; }
+  .bot-status-dot.offline { background: #ef4444; box-shadow: 0 0 0 2px rgba(239,68,68,.25);  animation: none; }
+  @keyframes pulse-green { 0%,100%{box-shadow:0 0 0 2px rgba(34,197,94,.25)} 50%{box-shadow:0 0 0 6px rgba(34,197,94,.1)} }
+  @keyframes pulse-gray  { 0%,100%{box-shadow:0 0 0 2px rgba(107,114,128,.25)} 50%{box-shadow:0 0 0 5px rgba(107,114,128,.08)} }
+
+  /* ── Bot Power Toggle ── */
+  .bot-power-panel {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 16px 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 16px;
+  }
+  .bot-power-btn {
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    background: var(--bg);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.5rem;
+    transition: all .2s;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .bot-power-btn:hover { transform: scale(1.08); }
+  .bot-power-btn.is-on {
+    border-color: #22c55e;
+    background: rgba(34,197,94,.1);
+    box-shadow: 0 0 0 4px rgba(34,197,94,.15);
+  }
+  .bot-power-btn.is-on:hover {
+    background: rgba(239,68,68,.12);
+    border-color: #ef4444;
+    box-shadow: 0 0 0 4px rgba(239,68,68,.12);
+  }
+  .bot-power-btn.is-off {
+    border-color: #6b7280;
+    background: rgba(107,114,128,.08);
+  }
+  .bot-power-btn.is-off:hover {
+    background: rgba(34,197,94,.1);
+    border-color: #22c55e;
+    box-shadow: 0 0 0 4px rgba(34,197,94,.15);
+  }
+  .bot-power-btn.loading {
+    animation: spin 1s linear infinite;
+    pointer-events: none;
+    opacity: .7;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .bot-power-info { flex: 1; }
+  .bot-power-title { font-weight: 700; font-size: 15px; margin-bottom: 2px; }
+  .bot-power-sub { font-size: 12px; color: var(--muted); }
+  .bot-power-pid {
+    display: inline-block;
+    padding: 2px 8px;
+    background: rgba(34,197,94,.12);
+    border: 1px solid rgba(34,197,94,.3);
+    border-radius: 4px;
+    font-size: 11px;
+    color: #16a34a;
+    font-family: monospace;
+    margin-left: 6px;
+  }
+  [data-theme="dark"] .bot-power-pid { color: #4ade80; background: rgba(34,197,94,.15); border-color: rgba(34,197,94,.25); }
+  .bot-action-hint {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  /* ── Task buttons ── */
+  .task-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+  .task-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 16px;
+    text-align: center; cursor: pointer; transition: all .2s;
+    background: var(--surface);
+  }
+  .task-card:hover { border-color: var(--accent); box-shadow: 0 4px 16px rgba(124,107,255,.12); }
+  .task-card .task-icon { font-size: 1.8rem; margin-bottom: 8px; line-height: 1; }
+  .task-card .task-name { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+  .task-card .task-desc { font-size: 11px; color: var(--muted); line-height: 1.4; }
+  .task-card.running { border-color: var(--warning); opacity: .8; pointer-events: none; }
+  .task-card .task-spin { display: none; }
+  .task-card.running .task-spin { display: inline; }
+  .task-card.running .task-icon-static { display: none; }
+  /* ── Task progress panel ── */
+  .task-progress-wrap {
+    margin-top: 14px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    background: var(--bg);
+  }
+  .task-progress-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .task-progress-title {
+    font-size: 13px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .task-running-dot {
+    display: none;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #f59e0b;
+    flex-shrink: 0;
+    animation: pulse-warn 1s infinite;
+  }
+  .task-progress-wrap.is-running .task-running-dot { display: inline-block; }
+  @keyframes pulse-warn {
+    0%,100%{box-shadow:0 0 0 2px rgba(245,158,11,.25)}
+    50%{box-shadow:0 0 0 6px rgba(245,158,11,.1)}
+  }
+  .task-progress-meta { font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .task-progress-bar {
+    height: 8px;
+    border-radius: 999px;
+    background: rgba(124,107,255,.15);
+    overflow: hidden;
+    margin-bottom: 10px;
+  }
+  .task-progress-fill {
+    width: 0%;
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #7c6bff, #4f46e5);
+    transition: width .35s ease;
+  }
+  .task-progress-wrap.is-running .task-progress-fill {
+    animation: progress-shimmer 1.5s ease-in-out infinite;
+  }
+  @keyframes progress-shimmer {
+    0%,100%{filter:brightness(1)} 50%{filter:brightness(1.25)}
+  }
+  .task-log-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .task-log-toolbar button {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--muted);
+    font-size: 10px;
+    padding: 2px 7px;
+    cursor: pointer;
+  }
+  .task-log-toolbar button:hover { color: var(--fg); border-color: var(--accent); }
+  .btn-stop-task {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    background: rgba(239,68,68,.12);
+    border: 1px solid rgba(239,68,68,.4);
+    color: #f87171;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 5px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background .15s, border-color .15s;
+  }
+  .btn-stop-task:hover { background: rgba(239,68,68,.22); border-color: #ef4444; }
+  .btn-stop-task.requesting {
+    opacity: .7;
+    pointer-events: none;
+    cursor: not-allowed;
+  }
+  .task-progress-wrap.is-running .btn-stop-task { display: inline-flex; }
+  .task-log-box {
+    max-height: 300px;
+    overflow: auto;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    background: #0f172a;
+    color: #cbd5e1;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 11px;
+    white-space: pre-wrap;
+    line-height: 1.5;
+  }
+  .task-log-box .log-ok   { color: #4ade80; }
+  .task-log-box .log-err  { color: #f87171; }
+  .task-log-box .log-inf  { color: #93c5fd; }
+  .task-log-box .log-warn { color: #fbbf24; }
+  .task-log-box .log-hdr  { color: #818cf8; font-weight: 700; }
+  .task-log-box .log-sub  { color: #64748b; }
+  /* 任務即時統計欄 */
+  .task-stats-strip {
+    display: none;
+    align-items: center;
+    gap: 16px;
+    padding: 5px 0;
+    margin-bottom: 6px;
+    font-size: 11px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+  }
+  .task-progress-wrap.is-running .task-stats-strip { display: flex; }
+  .task-stats-chip {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .task-stats-chip span:first-child { opacity: .6; }
+  .task-stats-chip strong { color: var(--fg); font-size: 12px; }
+  /* ── Task history ── */
+  .task-history {
+    margin-top: 14px;
+    border-top: 1px solid var(--border);
+    padding-top: 10px;
+  }
+  .task-history-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    margin-bottom: 8px;
+  }
+  .task-history-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .task-history-item:last-child { border-bottom: none; }
+  .task-history-item:hover { background: rgba(124,107,255,.04); }
+  .th-badge {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .th-badge.success  { background: rgba(34,197,94,.15);  color: #16a34a; }
+  .th-badge.failed   { background: rgba(239,68,68,.15);  color: #dc2626; }
+  .th-badge.running  { background: rgba(245,158,11,.15); color: #d97706; }
+  .th-badge.cancelled{ background: rgba(107,114,128,.15);color: #4b5563; }
+  .th-badge.pending  { background: rgba(124,107,255,.15);color: #7c6bff; }
+  [data-theme="dark"] .th-badge.success  { color: #4ade80; }
+  [data-theme="dark"] .th-badge.failed   { color: #f87171; }
+  [data-theme="dark"] .th-badge.running  { color: #fbbf24; }
+  [data-theme="dark"] .th-badge.cancelled{ color: #9ca3af; }
+
+  /* ── Channel table actions ── */
+  .btn-icon {
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 3px 8px; font-size: 11px; cursor: pointer;
+    background: transparent; color: var(--text); transition: all .15s;
+  }
+  .btn-icon:hover { background: var(--border); }
+  .btn-icon.danger:hover { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
+  [data-theme="dark"] .btn-icon.danger:hover { background: #450a0a; color: #fca5a5; border-color: #7f1d1d; }
+
+  /* ── Add channel form inline ── */
+  #addChannelRow td { padding-top: 10px !important; padding-bottom: 10px !important; }
+  #addChannelRow input, #addChannelRow select {
+    font-size: 12px; padding: 5px 8px; width: 100%;
+    border: 1px solid var(--border); border-radius: 6px;
+    background: var(--bg); color: var(--text); outline: none;
+  }
+  #addChannelRow input:focus, #addChannelRow select:focus { border-color: var(--accent); }
+
+  /* ── Message table ── */
+  .msg-content { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+  .msg-content:hover { color: var(--accent); text-decoration: underline; }
+  .msg-row { cursor: pointer; }
+  .msg-row:hover { background: rgba(124,107,255,.06); }
+  .msg-row td:first-child,
+  .msg-row td:last-child { cursor: default; }
+  .btn-msg-view {
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 2px 8px;
+    font-size: 10px;
+    background: transparent;
+    color: var(--accent);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .btn-msg-view:hover { background: rgba(124,107,255,.12); border-color: var(--accent); }
+  /* 訊息詳情 Modal */
+  .msg-detail-grid {
+    display: grid;
+    grid-template-columns: 110px 1fr;
+    gap: 8px 12px;
+    font-size: 12px;
+    margin-bottom: 14px;
+  }
+  .msg-detail-grid dt { color: var(--muted); font-weight: 500; margin: 0; }
+  .msg-detail-grid dd { margin: 0; word-break: break-all; }
+  .msg-detail-body {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    background: var(--bg);
+    font-size: 13px;
+    line-height: 1.65;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 320px;
+    overflow: auto;
+  }
+  .msg-detail-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .msg-tools { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .msg-tools input, .msg-tools select {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 11px;
+    padding: 4px 7px;
+    background: var(--bg);
+    color: var(--text);
+    outline: none;
+  }
+  .pill-xs { font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 600; }
+  .pill-uma    { background: #d1fae5; color: #065f46; }
+  .pill-nonuma { background: #f3f4f6; color: #6b7280; }
+  .pill-pend   { background: #fef3c7; color: #92400e; }
+  [data-theme="dark"] .pill-uma    { background: #064e3b; color: #6ee7b7; }
+  [data-theme="dark"] .pill-nonuma { background: #374151; color: #9ca3af; }
+  [data-theme="dark"] .pill-pend   { background: #451a03; color: #fcd34d; }
+
+  /* ── Commands reference ── */
+  .cmd-table td { padding: 6px 10px; font-size: 12px; vertical-align: top; }
+  .cmd-table code { font-size: 11px; white-space: nowrap; }
+  .cmd-table td:last-child { color: var(--muted); }
+
+  /* ── News log expand ── */
+  .news-preview { max-height: 72px; overflow: hidden; position: relative; font-size: 12px; line-height: 1.5; color: var(--muted); }
+  .news-preview::after { content:''; position:absolute; bottom:0; left:0; right:0; height:20px; background: linear-gradient(transparent, var(--surface)); }
+
+  /* ── Toast ── */
+  #toast {
+    position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+    background: var(--accent); color: #fff; border-radius: 8px;
+    padding: 10px 18px; font-size: 13px; font-weight: 600;
+    box-shadow: 0 4px 20px rgba(0,0,0,.25); opacity: 0;
+    transition: opacity .25s; pointer-events: none;
+  }
+  #toast.show { opacity: 1; }
+  #toast.err  { background: #dc2626; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-row">
+    <div>
+      <h1>Discord Bot 管理</h1>
+      <p class="page-subtitle">頻道設定 · 訊息爬取 · 主題分類 · AI 新聞推播</p>
+    </div>
+    <div class="all-btn-row">
+      <button class="btn btn-outline-secondary btn-sm" onclick="refreshStats()">↻ 重新整理</button>
+    </div>
+  </div>
+</div>
+
+<!-- ① 統計卡片 -->
+<div class="stat-cards mb-3" id="statCards">
+  <div class="stat-card c-accent">
+    <div class="val" id="sc-total">{{ discord_data.total_messages|default:0 }}</div>
+    <div class="lbl">Discord 訊息總數</div>
+  </div>
+  <div class="stat-card c-green">
+    <div class="val" id="sc-uma">{{ discord_data.uma_messages|default:0 }}</div>
+    <div class="lbl">主題相關訊息</div>
+  </div>
+  <div class="stat-card c-orange">
+    <div class="val" id="sc-pend">{{ discord_data.unclassified|default:0 }}</div>
+    <div class="lbl">待分類訊息</div>
+  </div>
+  <div class="stat-card c-blue">
+    <div class="val" id="sc-today">{{ discord_data.news_today|default:0 }}</div>
+    <div class="lbl">今日推播次數</div>
+  </div>
+</div>
+
+<!-- ② Bot 狀態卡片（含啟動開關） -->
+<div class="card mb-3">
+  <div class="card-header-bar">
+    <h5>Bot 狀態</h5>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span id="botStatusBadge" style="font-size:12px;color:var(--muted);">
+        <span class="bot-status-dot" id="botDot"></span>
+        <span id="botStatusText">查詢中…</span>
+      </span>
+    </div>
+  </div>
+  <div class="card-body">
+
+    <!-- 電源開關區塊 -->
+    <div class="bot-power-panel" id="botPowerPanel">
+      <button class="bot-power-btn is-off" id="botPowerBtn"
+              onclick="toggleBot()" title="點擊啟動/停止 Bot">
+        ⏻
+      </button>
+      <div class="bot-power-info">
+        <div class="bot-power-title" id="botPowerTitle">
+          Discord Bot
+          <span class="bot-power-pid" id="botPidBadge" style="display:none;"></span>
+        </div>
+        <div class="bot-power-sub" id="botPowerSub">正在查詢狀態…</div>
+        <div class="bot-action-hint" id="botActionHint"></div>
+      </div>
+      <div style="text-align:right;flex-shrink:0;">
+        <button class="btn btn-outline-secondary btn-sm" onclick="fetchBotStatus()" style="font-size:11px;">
+          ↻ 重新整理
+        </button>
+      </div>
+    </div>
+
+    <div class="row g-3">
+      <div class="col-md-6">
+        <div class="callout">
+          <div style="font-size:12px;line-height:1.9;">
+            <strong>手動啟動指令：</strong><br>
+            <code>python manage.py run_discord_bot</code><br>
+            <strong>Docker 模式：</strong><br>
+            <code>docker compose up discord-bot -d</code><br>
+            <strong>查看 Docker 日誌：</strong><br>
+            <code>docker compose logs -f discord-bot</code>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div style="font-size:12px;line-height:2;">
+          <div>
+            Bot Token：
+            {% if discord_data.bot_token_set %}
+              <span class="pill pill-green" style="font-size:11px;">已設定</span>
+            {% else %}
+              <span class="pill pill-red" style="font-size:11px;">未設定</span>
+              <span style="color:var(--muted);"> — 請在 .env 填入 DISCORD_BOT_TOKEN</span>
+            {% endif %}
+          </div>
+          <div>新聞生成模型：<code>{{ discord_data.news_model }}</code></div>
+          <div>排程任務：爬取（每60分鐘）· 分類（每2小時）· 推播（依伺服器設定）</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ③ 頻道設定管理 -->
+<div class="card mb-3">
+  <div class="card-header-bar">
+    <h5>頻道設定管理</h5>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span style="font-size:11px;color:var(--muted);" id="cfgCount">共 {{ discord_data.configs|length }} 筆</span>
+      <button class="btn btn-accent btn-sm" onclick="toggleAddRow()">+ 新增頻道</button>
+    </div>
+  </div>
+  <div class="card-body p-0">
+    <div class="tbl-wrap">
+      <table id="channelTable">
+        <thead>
+          <tr>
+            <th style="width:160px;">名稱</th>
+            <th>頻道 ID</th>
+            <th style="width:100px;">類型</th>
+            <th style="width:80px;">狀態</th>
+            <th>備注</th>
+            <th style="width:120px;text-align:right;">操作</th>
+          </tr>
+        </thead>
+        <tbody id="channelBody">
+          {% for cfg in discord_data.configs %}
+          <tr id="cfgRow-{{ cfg.pk }}">
+            <td style="font-weight:600;">{{ cfg.name }}</td>
+            <td><code style="font-size:11px;">{{ cfg.channel_id }}</code></td>
+            <td>
+              {% if cfg.channel_type == 'crawl' %}
+                <span class="pill pill-blue">爬取</span>
+              {% else %}
+                <span class="pill pill-accent">推播</span>
+              {% endif %}
+            </td>
+            <td>
+              <span class="pill {% if cfg.is_active %}pill-green{% else %}pill-gray{% endif %}"
+                    id="cfgStatus-{{ cfg.pk }}">
+                {% if cfg.is_active %}啟用{% else %}停用{% endif %}
+              </span>
+            </td>
+            <td style="font-size:11px;color:var(--muted);">{{ cfg.note|default:"—"|truncatechars:40 }}</td>
+            <td style="text-align:right;">
+              <button class="btn-icon" onclick="toggleChannel({{ cfg.pk }})">切換</button>
+              <button class="btn-icon danger" onclick="deleteChannel({{ cfg.pk }}, '{{ cfg.name }}')">刪除</button>
+            </td>
+          </tr>
+          {% empty %}
+          <tr id="emptyRow">
+            <td colspan="6" style="text-align:center;color:var(--muted);font-size:13px;padding:20px;">
+              尚無頻道設定 — 點擊「+ 新增頻道」或在 Discord 輸入 <code>!channel set crawl 頻道名稱</code>
+            </td>
+          </tr>
+          {% endfor %}
+          <!-- 新增列（預設隱藏） -->
+          <tr id="addChannelRow" style="display:none;">
+            <td><input id="in-name" type="text" placeholder="頻道名稱*"></td>
+            <td><input id="in-id" type="text" placeholder="頻道 ID（純數字）*" pattern="\d+"></td>
+            <td>
+              <select id="in-type">
+                <option value="crawl">爬取</option>
+                <option value="news">推播</option>
+              </select>
+            </td>
+            <td><span style="font-size:11px;color:var(--muted);">啟用</span></td>
+            <td><input id="in-note" type="text" placeholder="備注（選填）"></td>
+            <td style="text-align:right;">
+              <button class="btn btn-accent btn-sm" onclick="submitAddChannel()" style="font-size:11px;padding:3px 10px;">儲存</button>
+              <button class="btn-icon" onclick="toggleAddRow()" style="margin-left:4px;">取消</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div id="addChannelMsg" style="padding:8px 16px;font-size:12px;display:none;"></div>
+  </div>
+</div>
+
+<!-- ③-b 爬取全域設定 -->
+<div class="card mb-3">
+  <div class="card-header-bar">
+    <h5>爬取全域設定</h5>
+    <span class="pill pill-gray" id="crawlSettingsBadge" style="font-size:11px;">載入中…</span>
+  </div>
+  <div class="card-body">
+    <div class="row g-3 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label" style="font-size:12px;">每頻道訊息上限（0 = 不限）</label>
+        <input id="crawlLimitInput" type="number" class="form-control" min="0" max="100000" value="1000" style="max-width:160px;" />
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;">首次全量爬取建議設 5000；增量模式設 500 即可</div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label" style="font-size:12px;">並行頻道數（1–10）</label>
+        <input id="crawlConcurrencyInput" type="number" class="form-control" min="1" max="10" value="3" style="max-width:120px;" />
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;">建議 3；伺服器頻道少時可設為 5</div>
+      </div>
+      <div class="col-md-4 d-flex align-items-end gap-2">
+        <button class="btn btn-accent btn-sm" onclick="saveCrawlSettings()">儲存設定</button>
+        <span id="crawlSettingsHint" style="font-size:12px;color:var(--muted);"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ④ 手動任務觸發 -->
+<div class="card mb-3">
+  <div class="card-header-bar">
+    <h5>手動任務觸發</h5>
+    <span style="font-size:11px;color:var(--muted);">背景執行（含進度與完整日誌）</span>
+  </div>
+  <div class="card-body">
+    <div class="task-grid">
+
+      <div class="task-card" id="task-crawl" onclick="runTask('crawl', this)">
+        <div class="task-icon">
+          <span class="task-icon-static">📡</span>
+          <span class="task-spin">⏳</span>
+        </div>
+        <div class="task-name">爬取頻道訊息</div>
+        <div class="task-desc">立即從所有爬取頻道拉取最新訊息（增量）</div>
+      </div>
+
+      <div class="task-card" id="task-classify" onclick="runTask('classify', this)">
+        <div class="task-icon">
+          <span class="task-icon-static">🔍</span>
+          <span class="task-spin">⏳</span>
+        </div>
+        <div class="task-name">分類待分類訊息</div>
+        <div class="task-desc">對 is_umamusume=null 的訊息執行關鍵字 + Gemini 雙層分類</div>
+      </div>
+
+      <div class="task-card" id="task-convert" onclick="runTask('convert', this)">
+        <div class="task-icon">
+          <span class="task-icon-static">🔄</span>
+          <span class="task-spin">⏳</span>
+        </div>
+        <div class="task-name">轉換至 NewsData</div>
+        <div class="task-desc">將馬娘相關 Discord 訊息匯入 NewsData 資料表</div>
+      </div>
+
+      <div class="task-card" id="task-news" onclick="runTask('news', this)">
+        <div class="task-icon">
+          <span class="task-icon-static">📨</span>
+          <span class="task-spin">⏳</span>
+        </div>
+        <div class="task-name">手動推播 AI 新聞</div>
+        <div class="task-desc">立即生成本週馬娘摘要並推播至所有推播頻道</div>
+      </div>
+
+    </div>
+    <div class="task-progress-wrap" id="taskProgressWrap">
+      <div class="task-progress-header">
+        <div class="task-progress-title">
+          <span class="task-running-dot" id="taskRunningDot"></span>
+          <span id="taskProgressTitle">等待任務啟動…</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <button class="btn-stop-task" id="btnStopTask" onclick="cancelTask()" title="傳送取消請求，任務完成目前操作後停止">
+            ⏹ 停止任務
+          </button>
+          <span class="task-progress-meta" id="taskProgressMeta">—</span>
+        </div>
+      </div>
+      <div class="task-progress-bar"><div class="task-progress-fill" id="taskProgressFill"></div></div>
+      <!-- 即時統計（爬取任務才顯示） -->
+      <div class="task-stats-strip" id="taskStatsStrip">
+        <div class="task-stats-chip">
+          <span>伺服器</span>
+          <strong id="statsServers">—</strong>
+        </div>
+        <div class="task-stats-chip">
+          <span>頻道</span>
+          <strong id="statsChannels">—</strong>
+        </div>
+        <div class="task-stats-chip">
+          <span>累積新訊息</span>
+          <strong id="statsNewMsgs" style="color:#4ade80;">+0</strong>
+        </div>
+      </div>
+      <div class="task-log-toolbar">
+        <span id="taskLogLineCount" style="color:var(--muted);">日誌輸出</span>
+        <div style="display:flex;gap:6px;">
+          <button onclick="document.getElementById('taskLogBox').scrollTop=0" title="捲到頂部">⬆ 頂部</button>
+          <button id="btnAutoScroll" onclick="toggleAutoScroll()" title="自動捲動" style="background:rgba(124,107,255,.15);color:#818cf8;border-color:#4f46e5;">↓ 自動捲動</button>
+          <button onclick="document.getElementById('taskLogBox').textContent=''" title="清除顯示">清除</button>
+        </div>
+      </div>
+      <div class="task-log-box" id="taskLogBox" style="max-height:400px;">（尚未執行任何任務，點擊上方任務卡片開始）</div>
+      <div class="task-history" id="taskHistory">
+        <div class="task-history-title">近期任務記錄</div>
+        <div id="taskHistoryList" style="color:var(--muted);font-size:12px;">載入中…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ⑤ 最近 Discord 訊息 -->
+<div class="card mb-3">
+  <div class="card-header-bar">
+    <h5>Discord 訊息查閱</h5>
+    <div class="msg-tools">
+      <input id="msgKeyword" type="text" placeholder="關鍵字">
+      <input id="msgDateFrom" type="date">
+      <input id="msgDateTo" type="date">
+      <input id="msgGuildId" type="text" placeholder="伺服器 ID">
+      <input id="msgChannelId" type="text" placeholder="頻道 ID">
+      <select id="msgClassify">
+        <option value="all">全部分類</option>
+        <option value="uma">僅馬娘</option>
+        <option value="nonuma">僅無關</option>
+        <option value="pending">僅待分類</option>
+      </select>
+      <select id="msgSortBy">
+        <option value="timestamp">時間</option>
+        <option value="author">作者</option>
+        <option value="channel_name">頻道</option>
+      </select>
+      <select id="msgSortDir">
+        <option value="desc">新到舊</option>
+        <option value="asc">舊到新</option>
+      </select>
+      <select id="msgLimit">
+        <option value="20">20 筆</option>
+        <option value="50">50 筆</option>
+        <option value="100">100 筆</option>
+        <option value="200">200 筆</option>
+      </select>
+      <button class="btn btn-outline-secondary btn-sm" onclick="loadRecentMessages(1)">查詢</button>
+      <button class="btn btn-outline-secondary btn-sm" onclick="clearMessageFilters()">清空</button>
+      <button class="btn btn-outline-secondary btn-sm" onclick="loadRecentMessages(msgPage)">↻ 更新</button>
+      <button class="btn btn-outline-danger btn-sm" onclick="deleteSelectedMessages()">刪除勾選</button>
+      <button class="btn btn-outline-danger btn-sm" onclick="deleteFilteredMessages()">刪除目前篩選</button>
+    </div>
+  </div>
+  <div class="card-body p-0">
+    <div class="tbl-wrap">
+      <table id="msgTable">
+        <thead>
+          <tr>
+            <th style="width:40px;"><input type="checkbox" id="msgSelectAll" onchange="toggleAllMessages(this.checked)"></th>
+            <th style="width:100px;">時間</th>
+            <th style="width:110px;">伺服器</th>
+            <th style="width:90px;">頻道</th>
+            <th style="width:90px;">作者</th>
+            <th>訊息內容</th>
+            <th style="width:80px;">分類</th>
+            <th style="width:70px;">方式</th>
+            <th style="width:55px;">已轉</th>
+            <th style="width:52px;">操作</th>
+          </tr>
+        </thead>
+        <tbody id="msgBody">
+          {% for msg in discord_data.recent_messages %}
+          <tr class="msg-row" data-msg-id="{{ msg.msg_id }}" onclick="openMsgDetail('{{ msg.msg_id }}')">
+            <td onclick="event.stopPropagation()"><input type="checkbox" class="msg-pick" value="{{ msg.msg_id }}"></td>
+            <td style="font-size:10px;white-space:nowrap;">{{ msg.timestamp|date:"m-d H:i" }}</td>
+            <td style="font-size:11px;color:var(--muted);">{{ msg.guild_id|default:"—" }}</td>
+            <td style="font-size:11px;color:var(--muted);">{{ msg.channel_name|truncatechars:12 }}</td>
+            <td style="font-size:11px;">{{ msg.author|truncatechars:12 }}</td>
+            <td><div class="msg-content" title="點擊查看完整內容">{{ msg.content|truncatechars:80 }}</div></td>
+            <td>
+              {% if msg.is_umamusume == True %}
+                <span class="pill-xs pill-uma">馬娘</span>
+              {% elif msg.is_umamusume == False %}
+                <span class="pill-xs pill-nonuma">無關</span>
+              {% else %}
+                <span class="pill-xs pill-pend">待分類</span>
+              {% endif %}
+            </td>
+            <td style="font-size:10px;color:var(--muted);">{{ msg.classified_by|default:"—" }}</td>
+            <td style="font-size:10px;">{% if msg.news_data_id %}✅{% else %}—{% endif %}</td>
+            <td onclick="event.stopPropagation()"><button type="button" class="btn-msg-view" onclick="openMsgDetail('{{ msg.msg_id }}')">查看</button></td>
+          </tr>
+          {% empty %}
+          <tr id="msgEmpty">
+            <td colspan="10" style="text-align:center;color:var(--muted);font-size:13px;padding:20px;">
+              尚無訊息。Bot 上線並設定爬取頻道後，每 60 分鐘自動爬取一次。
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div style="padding:8px 14px;font-size:11px;color:var(--muted);display:flex;justify-content:space-between;align-items:center;">
+      <span id="msgPagerInfo">—</span>
+      <div style="display:flex;gap:6px;">
+        <button class="btn btn-outline-secondary btn-sm" onclick="loadRecentMessages(Math.max(1,msgPage-1))">上一頁</button>
+        <button class="btn btn-outline-secondary btn-sm" onclick="loadRecentMessages(msgPage+1)">下一頁</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ⑥ 推播歷史 + Bot 指令 (並排) -->
+<div class="row g-3 mb-3">
+  <!-- 推播歷史 -->
+  <div class="col-md-7">
+    <div class="card h-100">
+      <div class="card-header-bar">
+        <h5>新聞推播歷史（最近 10 筆）</h5>
+        <a href="/admin/app_discord_bot/discordnewslog/" target="_blank"
+           style="font-size:11px;color:var(--accent);">全部 →</a>
+      </div>
+      <div class="card-body p-0">
+        {% if discord_data.news_logs %}
+        <div class="tbl-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:80px;">時間</th>
+                <th style="width:90px;">頻道 ID</th>
+                <th style="width:90px;">模型</th>
+                <th>內容摘要</th>
+                <th style="width:70px;">狀態</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for log in discord_data.news_logs %}
+              <tr>
+                <td style="font-size:10px;white-space:nowrap;">{{ log.created_at|date:"m-d H:i" }}</td>
+                <td><code style="font-size:10px;">{{ log.channel_id }}</code></td>
+                <td style="font-size:11px;">{{ log.model_used|default:"—"|truncatechars:16 }}</td>
+                <td><div class="news-preview">{{ log.content|truncatechars:100 }}</div></td>
+                <td>
+                  {% if log.status == 'sent' %}
+                    <span class="pill pill-green" style="font-size:10px;">已推播</span>
+                  {% elif log.status == 'failed' %}
+                    <span class="pill pill-red" style="font-size:10px;">失敗</span>
+                  {% else %}
+                    <span class="pill pill-yellow" style="font-size:10px;">待推播</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div style="padding:20px;text-align:center;color:var(--muted);font-size:13px;">
+          尚無推播記錄。Bot 每日 20:00 自動推播，或點擊上方「手動推播 AI 新聞」。
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Bot 指令說明 -->
+  <div class="col-md-5">
+    <div class="card h-100">
+      <div class="card-header-bar"><h5>Discord Bot 指令</h5></div>
+      <div class="card-body">
+        <p style="font-size:12px;color:var(--muted);margin-bottom:12px;">在任意 Discord 頻道輸入以下指令（Bot 需已上線）：</p>
+        <table class="cmd-table" style="width:100%;border-collapse:collapse;">
+          <tbody>
+            <tr>
+              <td><code>!channel help</code></td>
+              <td>顯示所有指令說明</td>
+            </tr>
+            <tr>
+              <td><code>!channel set crawl [名稱]</code></td>
+              <td>設當前頻道為爬取頻道</td>
+            </tr>
+            <tr>
+              <td><code>!channel set news [名稱]</code></td>
+              <td>設當前頻道為推播頻道</td>
+            </tr>
+            <tr>
+              <td><code>!channel list</code></td>
+              <td>列出所有頻道設定</td>
+            </tr>
+            <tr>
+              <td><code>!channel remove</code></td>
+              <td>移除當前頻道設定</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="callout mt-3" style="font-size:11px;">
+          Bot 指令與此頁面的設定共用同一個資料庫，兩端皆可管理，即時生效。
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+{% endblock %}
+
+{% block modals %}
+<!-- Discord 訊息詳情 -->
+<div class="modal fade" id="msgDetailModal" tabindex="-1" aria-labelledby="msgDetailTitle">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="msgDetailTitle">訊息詳情</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="關閉"></button>
+      </div>
+      <div class="modal-body">
+        <dl class="msg-detail-grid" id="msgDetailMeta"></dl>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">完整訊息內容</div>
+        <div class="msg-detail-body" id="msgDetailContent"></div>
+        <div class="msg-detail-actions">
+          <button type="button" class="btn btn-outline-secondary btn-sm" onclick="copyMsgField('content')">複製內容</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm" onclick="copyMsgField('msg_id')">複製訊息 ID</button>
+          <a id="msgDetailDiscordLink" href="#" target="_blank" rel="noopener noreferrer"
+             class="btn btn-outline-primary btn-sm" style="display:none;">在 Discord 開啟</a>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">關閉</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const CSRF = () => { const m = document.cookie.match(/csrftoken=([^;]+)/); return m ? m[1] : ''; };
+
+function toast(msg, isErr) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'show' + (isErr ? ' err' : '');
+  setTimeout(() => { el.className = ''; }, 3000);
+}
+
+async function postJSON(url, data) {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF() },
+    body: JSON.stringify(data || {})
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+  return json;
+}
+
+// ══════════════════════════════════════════════════════════════
+// ── Bot 電源開關 ──────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════
+
+const BOT_STATUS_URL = '{% url "app_crawler_admin:api_discord_bot_status" %}';
+const BOT_START_URL  = '{% url "app_crawler_admin:api_discord_bot_start" %}';
+const BOT_STOP_URL   = '{% url "app_crawler_admin:api_discord_bot_stop" %}';
+
+let _botRunning = null;   // 快取狀態
+let _statusTimer = null;
+
+function _applyBotStatus(running, pid) {
+  _botRunning = running;
+  const btn    = document.getElementById('botPowerBtn');
+  const dot    = document.getElementById('botDot');
+  const badge  = document.getElementById('botStatusBadge');
+  const text   = document.getElementById('botStatusText');
+  const sub    = document.getElementById('botPowerSub');
+  const hint   = document.getElementById('botActionHint');
+  const pidBdg = document.getElementById('botPidBadge');
+
+  if (running) {
+    btn.className     = 'bot-power-btn is-on';
+    btn.title         = 'Bot 運行中 — 點擊停止';
+    btn.textContent   = '⏻';
+    dot.className     = 'bot-status-dot online';
+    text.textContent  = '運行中';
+    sub.innerHTML     = '<span style="color:#16a34a;font-weight:700;">● 已上線</span>　Bot 正常運作中';
+    hint.textContent  = '點擊電源按鈕可停止 Bot';
+    if (pid) {
+      pidBdg.textContent  = `PID: ${pid}`;
+      pidBdg.style.display = 'inline-block';
+    }
+  } else {
+    btn.className     = 'bot-power-btn is-off';
+    btn.title         = 'Bot 已停止 — 點擊啟動';
+    btn.textContent   = '⏻';
+    dot.className     = 'bot-status-dot offline';
+    text.textContent  = '已停止';
+    sub.innerHTML     = '<span style="color:#6b7280;font-weight:700;">● 離線</span>　Bot 目前未運行';
+    hint.textContent  = '點擊電源按鈕可啟動 Bot';
+    pidBdg.style.display = 'none';
+  }
+}
+
+async function fetchBotStatus() {
+  try {
+    const d = await fetch(BOT_STATUS_URL).then(r => r.json());
+    _applyBotStatus(d.running, d.pid);
+  } catch(e) {
+    document.getElementById('botPowerSub').textContent = '狀態查詢失敗，請重試';
+  }
+}
+
+async function toggleBot() {
+  const btn = document.getElementById('botPowerBtn');
+  btn.className = 'bot-power-btn loading';
+  btn.textContent = '⟳';
+
+  const document_sub = document.getElementById('botPowerSub');
+  document_sub.textContent = _botRunning ? '正在停止…' : '正在啟動…';
+
+  try {
+    const url = _botRunning ? BOT_STOP_URL : BOT_START_URL;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': CSRF() },
+    });
+    const d = await res.json();
+
+    if (d.success) {
+      toast(d.message);
+      // 延遲 1.5 秒後重新查詢狀態（Bot 啟動需要時間連線）
+      setTimeout(() => fetchBotStatus(), 1500);
+    } else {
+      toast(d.message, true);
+      fetchBotStatus();  // 恢復正確狀態
+    }
+  } catch(e) {
+    toast('操作失敗：' + e.message, true);
+    fetchBotStatus();
+  }
+}
+
+// 頁面載入即查詢，之後每 10 秒自動更新一次
+fetchBotStatus();
+_statusTimer = setInterval(fetchBotStatus, 10000);
+
+// ── 爬取全域設定 ──
+async function loadCrawlSettings() {
+  try {
+    const d = await fetch('{% url "app_crawler_admin:api_discord_crawl_settings_get" %}').then(r => r.json());
+    if (d.ok) {
+      document.getElementById('crawlLimitInput').value = d.crawl_limit;
+      document.getElementById('crawlConcurrencyInput').value = d.concurrency;
+      const badge = document.getElementById('crawlSettingsBadge');
+      badge.textContent = `上限 ${d.crawl_limit || '不限'} · 並行 ${d.concurrency}`;
+      badge.className = 'pill pill-green';
+    }
+  } catch(e) {
+    document.getElementById('crawlSettingsBadge').textContent = '載入失敗';
+  }
+}
+
+async function saveCrawlSettings() {
+  const limit = parseInt(document.getElementById('crawlLimitInput').value, 10);
+  const conc  = parseInt(document.getElementById('crawlConcurrencyInput').value, 10);
+  const hint  = document.getElementById('crawlSettingsHint');
+  hint.textContent = '儲存中…';
+  hint.style.color = 'var(--muted)';
+  try {
+    const d = await fetch('{% url "app_crawler_admin:api_discord_crawl_settings_save" %}', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF()},
+      body: JSON.stringify({crawl_limit: limit, concurrency: conc}),
+    }).then(r => r.json());
+    if (d.ok) {
+      hint.textContent = '✓ 已儲存';
+      hint.style.color = 'var(--positive)';
+      const badge = document.getElementById('crawlSettingsBadge');
+      badge.textContent = `上限 ${d.crawl_limit || '不限'} · 並行 ${d.concurrency}`;
+      badge.className = 'pill pill-green';
+    } else {
+      hint.textContent = '失敗：' + (d.error || '未知錯誤');
+      hint.style.color = 'var(--negative)';
+    }
+  } catch(e) {
+    hint.textContent = '失敗：' + e.message;
+    hint.style.color = 'var(--negative)';
+  }
+}
+
+loadCrawlSettings();
+
+// ── 統計刷新 ──
+async function refreshStats() {
+  try {
+    const d = await fetch('{% url "app_crawler_admin:api_discord_stats" %}').then(r => r.json());
+    document.getElementById('sc-total').textContent = d.total_messages ?? '—';
+    document.getElementById('sc-uma').textContent   = d.uma_messages  ?? '—';
+    document.getElementById('sc-pend').textContent  = d.unclassified  ?? '—';
+    document.getElementById('sc-today').textContent = d.news_today    ?? '—';
+    toast('統計已更新');
+  } catch(e) { toast('更新失敗：' + e.message, true); }
+}
+
+// ── 頻道新增列切換 ──
+function toggleAddRow() {
+  const row = document.getElementById('addChannelRow');
+  const show = row.style.display === 'none';
+  row.style.display = show ? '' : 'none';
+  if (show) document.getElementById('in-name').focus();
+  document.getElementById('addChannelMsg').style.display = 'none';
+}
+
+async function submitAddChannel() {
+  const msgEl = document.getElementById('addChannelMsg');
+  const payload = {
+    name:         document.getElementById('in-name').value.trim(),
+    channel_id:   document.getElementById('in-id').value.trim(),
+    channel_type: document.getElementById('in-type').value,
+    note:         document.getElementById('in-note').value.trim(),
+  };
+  if (!payload.name || !payload.channel_id) {
+    msgEl.style.display = ''; msgEl.style.color = '#dc2626';
+    msgEl.textContent = '名稱與頻道 ID 為必填';
+    return;
+  }
+  try {
+    const d = await postJSON('{% url "app_crawler_admin:api_discord_channel_add" %}', payload);
+    toast(d.status === 'created' ? `已新增：${d.name}` : `已更新：${d.name}`);
+    setTimeout(() => location.reload(), 800);
+  } catch(e) {
+    msgEl.style.display = ''; msgEl.style.color = '#dc2626';
+    msgEl.textContent = '錯誤：' + e.message;
+  }
+}
+
+async function toggleChannel(pk) {
+  try {
+    const d = await postJSON(`{% url "app_crawler_admin:api_discord_channel_toggle" pk=0 %}`.replace('/0/', `/${pk}/`));
+    const badge = document.getElementById(`cfgStatus-${pk}`);
+    if (badge) {
+      badge.textContent  = d.is_active ? '啟用' : '停用';
+      badge.className    = `pill ${d.is_active ? 'pill-green' : 'pill-gray'}`;
+    }
+    toast(d.is_active ? '已啟用' : '已停用');
+  } catch(e) { toast('操作失敗：' + e.message, true); }
+}
+
+async function deleteChannel(pk, name) {
+  if (!confirm(`確定刪除「${name}」的頻道設定？`)) return;
+  try {
+    await postJSON(`{% url "app_crawler_admin:api_discord_channel_delete" pk=0 %}`.replace('/0/', `/${pk}/`));
+    const row = document.getElementById(`cfgRow-${pk}`);
+    if (row) row.remove();
+    toast(`已刪除：${name}`);
+    // 更新筆數
+    const tbody = document.getElementById('channelBody');
+    const rows  = tbody.querySelectorAll('tr:not(#addChannelRow)');
+    document.getElementById('cfgCount').textContent = `共 ${rows.length} 筆`;
+  } catch(e) { toast('刪除失敗：' + e.message, true); }
+}
+
+// ── 任務觸發 + 進度 + 日誌 ──────────────────────────────────────
+const TASK_START_URL      = '{% url "app_crawler_admin:api_discord_task_start" %}';
+const TASK_STATUS_URL     = '{% url "app_crawler_admin:api_discord_task_status" %}';
+const TASK_LOG_URL_TMPL   = '{% url "app_crawler_admin:api_discord_task_log" run_id=0 %}';
+const TASK_CANCEL_URL_TMPL = '{% url "app_crawler_admin:api_discord_task_cancel" run_id=0 %}';
+const TASK_NAMES = {
+  crawl:    '爬取頻道訊息',
+  classify: '訊息分類',
+  convert:  '轉換 NewsData',
+  news:     'AI 新聞推播',
+};
+const TASK_STATUS_ZH = {
+  pending:   '等待中',
+  running:   '執行中',
+  success:   '成功',
+  failed:    '失敗',
+  cancelled: '已取消',
+};
+
+let currentTaskRunId    = null;
+let currentTaskLogOffset = 0;
+let taskPollTimer       = null;
+
+function escHtml(v) {
+  return String(v || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// 彩色日誌行：▶ 開頭藍色、✅ 綠色、❌ 紅色
+function colorLogLine(raw) {
+  const text = escHtml(raw);
+  const t = raw.trimStart();
+
+  // 伺服器標頭：▶ [N/M] 伺服器名稱
+  if (t.startsWith('▶')) return `<span class="log-hdr">${text}</span>`;
+
+  // 伺服器完成摘要：  ↳ ...
+  if (t.startsWith('↳')) return `<span class="log-inf">${text}</span>`;
+
+  // 成功（單一頻道或全部完成）
+  if (t.startsWith('✅') || t.startsWith('✓') || t.startsWith('+ '))
+    return `<span class="log-ok">${text}</span>`;
+
+  // 錯誤 / 失敗
+  if (t.startsWith('❌') || t.startsWith('✗') || t.startsWith('⛔') ||
+      t.toLowerCase().includes('error') || t.toLowerCase().includes('失敗'))
+    return `<span class="log-err">${text}</span>`;
+
+  // 警告
+  if (t.startsWith('⚠') || t.startsWith('⏳') || t.toLowerCase().includes('略過') || t.toLowerCase().includes('警告'))
+    return `<span class="log-warn">${text}</span>`;
+
+  // 連線資訊 / Bot 帳號
+  if (t.startsWith('✓ 已連線') || t.startsWith('Bot 已連線') || t.startsWith('[') || t.startsWith('Fallback'))
+    return `<span class="log-inf">${text}</span>`;
+
+  // 縮排的無權限說明
+  if (t.startsWith('無') || t.includes('無讀取權限') || t.includes('無法存取'))
+    return `<span class="log-sub">${text}</span>`;
+
+  return text;
+}
+
+let _autoScroll = true;
+
+// ── 停止任務 ────────────────────────────────────────────────────────────
+function _resetStopBtn() {
+  const btn = document.getElementById('btnStopTask');
+  if (btn) { btn.classList.remove('requesting'); btn.textContent = '⏹ 停止任務'; }
+}
+
+// 嘗試靜默取得最新任務狀態，若已非 running 立即更新 UI
+async function _checkAndSyncTaskStatus() {
+  if (!currentTaskRunId) return false;
+  try {
+    const st = await fetch(`${TASK_STATUS_URL}?run_id=${currentTaskRunId}`).then(r => r.json());
+    if (!st.run) return false;
+    updateTaskProgressUI(st.run);
+    const isRunning = ['pending', 'running'].includes(st.run.status);
+    if (!isRunning) {
+      clearInterval(taskPollTimer);
+      taskPollTimer = null;
+      document.querySelectorAll('.task-card').forEach(el => el.classList.remove('running'));
+      _resetStopBtn();
+      refreshTaskHistory();
+      if (st.run.status === 'cancelled') {
+        toast('⛔ 任務已取消');
+      }
+      return true;
+    }
+    return false;
+  } catch (_) {
+    return false;
+  }
+}
+
+async function cancelTask() {
+  if (!currentTaskRunId) { toast('沒有執行中的任務'); return; }
+  if (!confirm('確定要取消目前執行中的任務嗎？\n（任務會在完成目前頻道後停止）')) return;
+
+  const btn = document.getElementById('btnStopTask');
+  btn.classList.add('requesting');
+  btn.textContent = '⏳ 取消中…';
+
+  try {
+    const url = TASK_CANCEL_URL_TMPL.replace('/0/', `/${currentTaskRunId}/`);
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': CSRF() },
+    });
+    const d = await res.json();
+    if (!res.ok) {
+      toast(`取消失敗：${d.error || res.status}`, true);
+      _resetStopBtn();
+      return;
+    }
+
+    if (d.run) {
+      updateTaskProgressUI(d.run);
+      if (d.status === 'cancelled') {
+        toast('⛔ 任務已取消');
+        _resetStopBtn();
+        clearInterval(taskPollTimer);
+        taskPollTimer = null;
+        document.querySelectorAll('.task-card').forEach(el => el.classList.remove('running'));
+        refreshTaskHistory();
+        return;
+      }
+    }
+
+    toast('✓ 取消請求已送出，正在停止…');
+    appendTaskLog(['⚠ 已送出取消請求，正在停止任務…']);
+    _resetStopBtn();
+
+    if (taskPollTimer) clearInterval(taskPollTimer);
+    taskPollTimer = setInterval(pollTask, 1000);
+    let attempts = 0;
+    const cancelWatch = setInterval(async () => {
+      attempts++;
+      const done = await _checkAndSyncTaskStatus();
+      if (done || attempts >= 60) {
+        clearInterval(cancelWatch);
+        if (!done && attempts >= 60) {
+          toast('任務仍在停止中，請稍後再查看狀態', true);
+        }
+      }
+    }, 1000);
+  } catch (e) {
+    toast(`取消請求失敗：${e.message}`, true);
+    _resetStopBtn();
+  }
+}
+
+function toggleAutoScroll() {
+  _autoScroll = !_autoScroll;
+  const btn = document.getElementById('btnAutoScroll');
+  btn.textContent = _autoScroll ? '↓ 自動捲動' : '⏸ 自動捲動';
+  btn.style.background    = _autoScroll ? 'rgba(124,107,255,.15)' : 'rgba(100,116,139,.15)';
+  btn.style.borderColor   = _autoScroll ? '#4f46e5' : '#475569';
+  btn.style.color         = _autoScroll ? '#818cf8' : '#94a3b8';
+}
+
+function appendTaskLog(lines) {
+  if (!lines || !lines.length) return;
+  const box = document.getElementById('taskLogBox');
+  const frag = lines.map(colorLogLine).join('\n');
+  if (box.dataset.empty === '1') {
+    box.innerHTML = frag;
+    box.dataset.empty = '0';
+  } else {
+    box.innerHTML += '\n' + frag;
+  }
+  if (_autoScroll) box.scrollTop = box.scrollHeight;
+  // 行數統計（移除 HTML 標籤計算純行數）
+  const lineCount = (box.innerHTML.match(/\n/g) || []).length + 1;
+  document.getElementById('taskLogLineCount').textContent = `日誌 · ${lineCount} 行`;
+}
+
+// 解析 summary 字串更新統計欄
+// summary 格式：[N/M] ServerName — 頻道 A/B，累計 +C 筆
+function _parseAndUpdateStats(summ) {
+  if (!summ) return;
+  const mSrv = summ.match(/\[(\d+)\/(\d+)\]/);
+  const mCh  = summ.match(/頻道\s+(\d+)\/(\d+)/);
+  const mMsg = summ.match(/累計\s*\+(\d+)/);
+  if (mSrv) {
+    document.getElementById('statsServers').textContent   = `${mSrv[1]} / ${mSrv[2]}`;
+  }
+  if (mCh) {
+    document.getElementById('statsChannels').textContent  = `${mCh[1]} / ${mCh[2]}`;
+  }
+  if (mMsg) {
+    document.getElementById('statsNewMsgs').textContent   = `+${mMsg[1]}`;
+  }
+}
+
+function updateTaskProgressUI(run, isNew = false) {
+  const wrap  = document.getElementById('taskProgressWrap');
+  const fill  = document.getElementById('taskProgressFill');
+  const meta  = document.getElementById('taskProgressMeta');
+  const title = document.getElementById('taskProgressTitle');
+
+  const pct    = run.progress_pct || 0;
+  const stZh   = TASK_STATUS_ZH[run.status] || run.status;
+  const label  = run.task_label || TASK_NAMES[run.task_type] || run.task_type;
+  const summ   = run.summary || '';
+
+  fill.style.width = `${pct}%`;
+  meta.textContent = `Run #${run.id} · ${pct}% · ${stZh}`;
+
+  // 執行中時把 summary 拆到第二行，避免過長截斷
+  const isRunning = ['pending','running'].includes(run.status);
+  if (isRunning && summ) {
+    title.innerHTML = `<span>${escHtml(label)}</span><span style="font-weight:400;color:var(--muted);font-size:11px;margin-left:6px;">${escHtml(summ)}</span>`;
+  } else {
+    title.textContent = `${label}${summ ? '｜' + summ : ''}`;
+  }
+
+  // 執行中：黃色動畫點 + shimmer + 統計欄；停止後重設停止按鈕
+  wrap.classList.toggle('is-running', isRunning);
+  if (isRunning && run.task_type === 'crawl') {
+    _parseAndUpdateStats(summ);
+  }
+  if (!isRunning) {
+    const stopBtn = document.getElementById('btnStopTask');
+    stopBtn.classList.remove('requesting');
+    stopBtn.textContent = '⏹ 停止任務';
+  }
+
+  // 進度條顏色
+  fill.style.background =
+    run.status === 'success'   ? 'linear-gradient(90deg,#22c55e,#16a34a)' :
+    run.status === 'failed'    ? 'linear-gradient(90deg,#ef4444,#dc2626)' :
+    run.status === 'cancelled' ? 'linear-gradient(90deg,#6b7280,#4b5563)' :
+    'linear-gradient(90deg,#7c6bff,#4f46e5)';
+}
+
+// 任務歷史清單
+async function refreshTaskHistory() {
+  try {
+    const d = await fetch(TASK_STATUS_URL).then(r => r.json());
+    const list = document.getElementById('taskHistoryList');
+    if (!d.runs || !d.runs.length) {
+      list.textContent = '（尚無記錄）';
+      return;
+    }
+    list.innerHTML = d.runs.slice(0, 8).map(r => {
+      const label = TASK_NAMES[r.task_type] || r.task_type;
+      const stZh  = TASK_STATUS_ZH[r.status] || r.status;
+      const pct   = r.progress_pct || 0;
+      return `<div class="task-history-item" onclick="attachToTask(${r.id})" title="點擊查看日誌">
+        <span class="th-badge ${r.status}">${stZh}</span>
+        <span style="flex:1;">${escHtml(label)}</span>
+        <span style="color:var(--muted);font-size:10px;">${pct}%</span>
+        <span style="color:var(--muted);font-size:10px;white-space:nowrap;">${escHtml(r.summary || '').slice(0, 30)}</span>
+      </div>`;
+    }).join('');
+  } catch (_) {}
+}
+
+// 附加至指定 run（查看歷史任務的日誌）
+async function attachToTask(runId) {
+  currentTaskRunId     = runId;
+  currentTaskLogOffset = 0;
+  const box = document.getElementById('taskLogBox');
+  box.textContent = '載入日誌…';
+  box.dataset.empty = '0';
+  try {
+    const logURL = TASK_LOG_URL_TMPL.replace('/0/', `/${runId}/`);
+    const lg = await fetch(logURL).then(r => r.json());
+    box.innerHTML = '';
+    box.dataset.empty = '1';
+    if (lg.lines && lg.lines.length) {
+      currentTaskLogOffset = lg.total;
+      appendTaskLog(lg.lines);
+    } else {
+      box.textContent = '（此任務無日誌）';
+    }
+    updateTaskProgressUI(lg.run);
+    // 若任務仍在執行，啟動輪詢
+    if (['pending','running'].includes(lg.run.status)) {
+      if (taskPollTimer) clearInterval(taskPollTimer);
+      taskPollTimer = setInterval(pollTask, 1800);
+    }
+  } catch (e) {
+    box.textContent = '日誌載入失敗：' + e.message;
+  }
+}
+
+let _pollFailCount = 0;
+
+async function pollTask() {
+  if (!currentTaskRunId) return;
+  try {
+    const st = await fetch(`${TASK_STATUS_URL}?run_id=${currentTaskRunId}`).then(r => r.json());
+    if (!st.run) return;
+    _pollFailCount = 0;   // 成功 → 重設失敗計數
+    updateTaskProgressUI(st.run);
+
+    const logURL = TASK_LOG_URL_TMPL.replace('/0/', `/${currentTaskRunId}/`) + `?offset=${currentTaskLogOffset}`;
+    const lg = await fetch(logURL).then(r => r.json());
+    if (lg.lines && lg.lines.length) {
+      currentTaskLogOffset = lg.total || (currentTaskLogOffset + lg.lines.length);
+      appendTaskLog(lg.lines);
+    }
+
+    if (['success', 'failed', 'cancelled'].includes(st.run.status)) {
+      clearInterval(taskPollTimer);
+      taskPollTimer = null;
+      document.querySelectorAll('.task-card').forEach(el => el.classList.remove('running'));
+      refreshTaskHistory();
+      if (st.run.status === 'success') {
+        toast(`${TASK_NAMES[st.run.task_type] || st.run.task_type} 已完成 ✅`);
+        refreshStats();
+        loadRecentMessages(msgPage);
+      } else if (st.run.status === 'failed') {
+        toast(`任務失敗：${st.run.error_message || '未知錯誤'}`, true);
+      } else if (st.run.status === 'cancelled') {
+        toast('⛔ 任務已取消');
+      }
+    }
+  } catch (e) {
+    _pollFailCount++;
+    // 每 3 次失敗才 toast，避免刷屏
+    if (_pollFailCount % 3 === 1) {
+      toast(`輪詢暫時中斷（${_pollFailCount} 次），將自動重試…`, true);
+    }
+    // 3 次連續失敗後嘗試靜默同步一次，確保按鈕/狀態正確
+    if (_pollFailCount >= 3) {
+      await _checkAndSyncTaskStatus();
+    }
+  }
+}
+
+async function runTask(type, card) {
+  try {
+    document.querySelectorAll('.task-card').forEach(el => el.classList.remove('running'));
+    card.classList.add('running');
+    const d = await postJSON(TASK_START_URL, { task: type });
+    const run = d.run;
+    if (!run) throw new Error('回傳缺少任務資訊');
+
+    const isNew = d.status === 'started';
+    currentTaskRunId     = run.id;
+    currentTaskLogOffset = 0;
+    const box = document.getElementById('taskLogBox');
+    box.innerHTML = '';
+    box.dataset.empty = '1';
+
+    updateTaskProgressUI(run);
+    toast(isNew
+      ? `${TASK_NAMES[type]} 已啟動（Run #${run.id}）`
+      : `已有同類任務執行中，已切換至 Run #${run.id}`);
+
+    if (taskPollTimer) clearInterval(taskPollTimer);
+    taskPollTimer = setInterval(pollTask, 1800);
+    pollTask();
+  } catch (e) {
+    card.classList.remove('running');
+    toast(`${TASK_NAMES[type] || type} 啟動失敗：${e.message}`, true);
+  }
+}
+
+// ── 頁面載入：自動還原執行中任務 ────────────────────────────────
+async function initTaskPanel() {
+  await refreshTaskHistory();
+  try {
+    const d = await fetch(TASK_STATUS_URL).then(r => r.json());
+    if (!d.runs) return;
+    const active = d.runs.find(r => ['pending','running'].includes(r.status));
+    if (active) {
+      toast(`偵測到進行中任務（Run #${active.id}），已自動連線`);
+      await attachToTask(active.id);
+      const card = document.getElementById(`task-${active.task_type}`);
+      if (card) card.classList.add('running');
+    }
+  } catch (_) {}
+}
+
+// ── Discord 訊息查詢 ──
+const MSG_URL = '{% url "app_crawler_admin:api_discord_recent_messages" %}';
+const MSG_DELETE_URL = '{% url "app_crawler_admin:api_discord_delete_messages" %}';
+let msgPage = 1;
+let msgTotalPages = 1;
+const msgCache = {};          // msg_id → 完整訊息物件
+let msgDetailCurrent = null;  // 目前 Modal 顯示的訊息
+
+function classifyLabel(isUma) {
+  if (isUma === true)  return { text: '馬娘', cls: 'pill-uma' };
+  if (isUma === false) return { text: '無關', cls: 'pill-nonuma' };
+  return { text: '待分類', cls: 'pill-pend' };
+}
+
+function renderMsgRow(m) {
+  const uma = classifyLabel(m.is_umamusume);
+  const content = escHtml(m.content || '');
+  const preview = content.length > 100 ? content.slice(0, 100) + '…' : content;
+  const guildName = escHtml(m.guild_name || m.guild_id || '—');
+  const msgId = escHtml(m.msg_id);
+  return `<tr class="msg-row" data-msg-id="${msgId}" onclick="openMsgDetail('${msgId}')">
+    <td onclick="event.stopPropagation()"><input type="checkbox" class="msg-pick" value="${msgId}"></td>
+    <td style="font-size:10px;white-space:nowrap;">${escHtml(m.timestamp || '—')}</td>
+    <td style="font-size:11px;color:var(--muted);" title="${escHtml(m.guild_id || '')}">${guildName}</td>
+    <td style="font-size:11px;color:var(--muted);" title="${escHtml(m.channel_id || '')}">${escHtml((m.channel_name || '').slice(0, 18))}</td>
+    <td style="font-size:11px;">${escHtml((m.author || '').slice(0, 20))}</td>
+    <td><div class="msg-content" title="點擊查看完整內容">${preview}</div></td>
+    <td><span class="pill-xs ${uma.cls}">${uma.text}</span></td>
+    <td style="font-size:10px;color:var(--muted);">${escHtml(m.classified_by || '—')}</td>
+    <td style="font-size:10px;">${m.is_converted ? '✅' : '—'}</td>
+    <td onclick="event.stopPropagation()"><button type="button" class="btn-msg-view" onclick="openMsgDetail('${msgId}')">查看</button></td>
+  </tr>`;
+}
+
+async function fetchMsgDetail(msgId) {
+  if (msgCache[msgId]) return msgCache[msgId];
+  const q = new URLSearchParams({ msg_id: msgId, limit: '1', page: '1' });
+  const d = await fetch(`${MSG_URL}?${q}`).then(r => r.json());
+  if (d.error) throw new Error(d.error);
+  const m = (d.messages || [])[0];
+  if (!m) throw new Error('找不到此訊息');
+  msgCache[msgId] = m;
+  return m;
+}
+
+function renderMsgDetailMeta(m) {
+  const uma = classifyLabel(m.is_umamusume);
+  const classifiedBy = m.classified_by === 'keyword' ? '關鍵字'
+    : m.classified_by === 'gemini' ? 'Gemini AI'
+    : (m.classified_by || '—');
+  const converted = m.is_converted || m.news_data_id
+    ? `是（NewsData ID：${escHtml(m.news_data_id || '—')}）`
+    : '否';
+  const pairs = [
+    ['訊息 ID', m.msg_id],
+    ['發送時間', m.timestamp || '—'],
+    ['爬取時間', m.created_at || '—'],
+    ['伺服器', m.guild_name ? `${m.guild_name}（${m.guild_id}）` : (m.guild_id || '—')],
+    ['頻道', m.channel_name ? `#${m.channel_name}（${m.channel_id}）` : (m.channel_id || '—')],
+    ['作者', m.author || '—'],
+    ['分類', `<span class="pill-xs ${uma.cls}">${uma.text}</span>`],
+    ['分類方式', classifiedBy],
+    ['已轉 NewsData', converted],
+  ];
+  return pairs.map(([k, v]) =>
+    `<dt>${escHtml(k)}</dt><dd>${typeof v === 'string' && v.includes('<span') ? v : escHtml(String(v))}</dd>`
+  ).join('');
+}
+
+async function openMsgDetail(msgId) {
+  if (!msgId) return;
+  try {
+    const m = await fetchMsgDetail(msgId);
+    msgDetailCurrent = m;
+    document.getElementById('msgDetailTitle').textContent =
+      `訊息詳情 · ${(m.channel_name ? '#' + m.channel_name + ' · ' : '')}${(m.author || '').slice(0, 24)}`;
+    document.getElementById('msgDetailMeta').innerHTML = renderMsgDetailMeta(m);
+    document.getElementById('msgDetailContent').textContent = m.content || '（無文字內容）';
+    const link = document.getElementById('msgDetailDiscordLink');
+    if (m.guild_id && m.channel_id && m.msg_id) {
+      link.href = `https://discord.com/channels/${m.guild_id}/${m.channel_id}/${m.msg_id}`;
+      link.style.display = 'inline-block';
+    } else {
+      link.style.display = 'none';
+    }
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('msgDetailModal')).show();
+  } catch (e) {
+    toast('無法載入訊息詳情：' + e.message, true);
+  }
+}
+
+async function copyMsgField(field) {
+  if (!msgDetailCurrent) return;
+  const val = field === 'content' ? (msgDetailCurrent.content || '') : (msgDetailCurrent.msg_id || '');
+  try {
+    await navigator.clipboard.writeText(val);
+    toast(field === 'content' ? '已複製訊息內容' : '已複製訊息 ID');
+  } catch (_) {
+    toast('複製失敗，請手動選取', true);
+  }
+}
+
+function currentMsgFilters() {
+  return {
+    keyword: document.getElementById('msgKeyword').value.trim(),
+    date_from: document.getElementById('msgDateFrom').value,
+    date_to: document.getElementById('msgDateTo').value,
+    guild_id: document.getElementById('msgGuildId').value.trim(),
+    channel_id: document.getElementById('msgChannelId').value.trim(),
+    classify: document.getElementById('msgClassify').value,
+    sort_by: document.getElementById('msgSortBy').value,
+    sort_dir: document.getElementById('msgSortDir').value,
+    limit: document.getElementById('msgLimit').value,
+  };
+}
+
+function buildMsgQuery(pageNum) {
+  const p = new URLSearchParams({ ...currentMsgFilters(), page: String(pageNum || 1) });
+  return p.toString();
+}
+
+async function loadRecentMessages(pageNum = 1) {
+  try {
+    const q = buildMsgQuery(pageNum);
+    const d = await fetch(`${MSG_URL}?${q}`).then(r => r.json());
+    if (d.error) throw new Error(d.error);
+    const tbody = document.getElementById('msgBody');
+    if (!d.messages || !d.messages.length) {
+      tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--muted);padding:20px;font-size:13px;">查無資料</td></tr>';
+    } else {
+      d.messages.forEach(m => { msgCache[m.msg_id] = m; });
+      tbody.innerHTML = d.messages.map(renderMsgRow).join('');
+    }
+    msgPage = d.page || pageNum;
+    msgTotalPages = d.total_pages || 1;
+    document.getElementById('msgPagerInfo').textContent =
+      `第 ${msgPage}/${msgTotalPages} 頁 · 共 ${d.total || 0} 筆`;
+  } catch (e) {
+    toast('載入訊息失敗：' + e.message, true);
+  }
+}
+
+function clearMessageFilters() {
+  ['msgKeyword', 'msgDateFrom', 'msgDateTo', 'msgGuildId', 'msgChannelId'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('msgClassify').value = 'all';
+  document.getElementById('msgSortBy').value = 'timestamp';
+  document.getElementById('msgSortDir').value = 'desc';
+  document.getElementById('msgLimit').value = '20';
+  loadRecentMessages(1);
+}
+
+function toggleAllMessages(checked) {
+  document.querySelectorAll('.msg-pick').forEach(el => { el.checked = checked; });
+}
+
+async function deleteSelectedMessages() {
+  const ids = Array.from(document.querySelectorAll('.msg-pick:checked')).map(el => el.value);
+  if (!ids.length) {
+    toast('請先勾選要刪除的訊息', true);
+    return;
+  }
+  if (!confirm(`確定刪除勾選的 ${ids.length} 筆訊息？`)) return;
+  try {
+    const d = await postJSON(MSG_DELETE_URL, { msg_ids: ids });
+    toast(`已刪除 ${d.deleted || 0} 筆`);
+    refreshStats();
+    loadRecentMessages(msgPage);
+  } catch (e) {
+    toast('刪除失敗：' + e.message, true);
+  }
+}
+
+async function deleteFilteredMessages() {
+  const f = currentMsgFilters();
+  if (!confirm('確定刪除「目前篩選結果」的所有訊息？此動作無法復原。')) return;
+  try {
+    const d = await postJSON(MSG_DELETE_URL, { ...f, delete_filtered: true });
+    toast(`已刪除 ${d.deleted || 0} 筆（符合 ${d.matched || 0} 筆條件）`);
+    refreshStats();
+    loadRecentMessages(1);
+  } catch (e) {
+    toast('刪除失敗：' + e.message, true);
+  }
+}
+
+// 初始載入
+loadRecentMessages(1);
+initTaskPanel();   // 載入任務歷史並自動還原進行中的任務
+</script>
+{% endblock %}

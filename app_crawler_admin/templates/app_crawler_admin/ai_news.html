@@ -1,0 +1,704 @@
+{% extends "app_crawler_admin/base_admin.html" %}
+{% block title %}AI 新聞管理{% endblock %}
+{% block nav_ai_news %}active{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>🗞️ AI 新聞管理中心</h1>
+  <p class="page-subtitle">以前台資料集為基礎，產生可發布的專業新聞稿</p>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header-bar">
+    <h5>新聞生成參數</h5>
+  </div>
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-lg-4">
+        <label class="form-label">主題描述（自然語言）</label>
+        <input id="aiQuery" class="form-control" placeholder="例如：幫我整理最近新卡池與玩家討論熱點，重點放在培育影響" />
+      </div>
+      <div class="col-lg-2">
+        <label class="form-label">類別</label>
+        <select id="aiCategory" class="form-select">
+          <option value="全部">全部</option>
+          <option value="活動">活動</option>
+          <option value="卡池">卡池</option>
+          <option value="競賽">競賽</option>
+          <option value="系統">系統</option>
+          <option value="情報">情報</option>
+          <option value="攻略">攻略</option>
+          <option value="討論">討論</option>
+        </select>
+      </div>
+      <div class="col-lg-2">
+        <label class="form-label">來源</label>
+        <select id="aiSource" class="form-select">
+          <option value="all">全部</option>
+          <option value="bilibili">Bilibili</option>
+          <option value="bahamut">巴哈姆特</option>
+          <option value="udn">聯合新聞</option>
+          <option value="ettoday">ETtoday</option>
+          <option value="gamme">宅宅新聞</option>
+        </select>
+      </div>
+      <div class="col-lg-2">
+        <label class="form-label">最近週數</label>
+        <input id="aiWeeks" class="form-control" type="number" min="1" max="52" value="4" />
+      </div>
+      <div class="col-lg-2">
+        <label class="form-label">參考數量</label>
+        <input id="aiTopk" class="form-control" type="number" min="3" max="20" value="8" />
+      </div>
+      <div class="col-lg-4">
+        <label class="form-label">文字生成模型</label>
+        <select id="aiTextModel" class="form-select">
+          <option value="">載入中…</option>
+        </select>
+        <div id="aiModelMeta" style="margin-top:6px;font-size:12px;color:var(--muted);">模型資訊載入中…</div>
+      </div>
+      <div class="col-lg-3 d-flex align-items-end">
+        <div class="form-check">
+          <input id="aiPublish" class="form-check-input" type="checkbox" checked />
+          <label class="form-check-label" for="aiPublish">生成後直接發布</label>
+        </div>
+      </div>
+      <div class="col-lg-3 d-flex align-items-end">
+        <div class="form-check">
+          <input id="aiPushDiscord" class="form-check-input" type="checkbox" />
+          <label class="form-check-label" for="aiPushDiscord">生成後同步推播至 Discord</label>
+        </div>
+      </div>
+      <div class="col-lg-5 d-flex align-items-end justify-content-end gap-2">
+        <button class="btn btn-outline-secondary" onclick="loadNewsList()">重新整理清單</button>
+        <button class="btn btn-accent" onclick="generateNews()">產生 AI 新聞</button>
+      </div>
+    </div>
+    <div id="generateHint" style="margin-top:10px;color:var(--muted);font-size:12px;">建議直接輸入自然語言需求，系統會自動抽取檢索詞並生成新聞。</div>
+  </div>
+</div>
+
+<div class="card mb-3" id="discordPushCard">
+  <div class="card-header-bar">
+    <h5>Discord 推播</h5>
+    <span class="pill pill-gray" id="discordBotPill">載入中…</span>
+  </div>
+  <div class="card-body">
+    <div class="row g-3 mb-3">
+      <div class="col-lg-4">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:4px;">推播目標</div>
+        <div id="discordTargetSummary" style="font-size:14px;">—</div>
+      </div>
+      <div class="col-lg-4">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:4px;">進行中任務</div>
+        <div id="discordActiveTask" style="font-size:14px;">—</div>
+      </div>
+      <div class="col-lg-4 d-flex align-items-end justify-content-end gap-2">
+        <a href="{% url 'app_crawler_admin:discord_management' %}" class="btn btn-sm btn-outline-secondary">Discord 控制台</a>
+        <button class="btn btn-sm btn-outline-secondary" onclick="loadDiscordStatus()">重新整理</button>
+        <button class="btn btn-sm btn-outline-primary" id="btnBatchPush" onclick="pushSelectedArticlesToDiscord()">推播勾選新聞</button>
+        <button class="btn btn-sm btn-accent" id="btnWeeklyPush" onclick="pushWeeklyToDiscord()">推播週報摘要</button>
+      </div>
+    </div>
+    <div id="discordPushHint" style="font-size:12px;color:var(--muted);margin-bottom:10px;">
+      週報摘要與 Discord 控制台「手動推播 AI 新聞」相同；單篇新聞可從下方清單按「推播至 Discord」。
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:140px;">時間</th>
+            <th style="width:140px;">伺服器</th>
+            <th style="width:90px;">狀態</th>
+            <th>內容預覽</th>
+          </tr>
+        </thead>
+        <tbody id="discordLogBody">
+          <tr><td colspan="4" style="text-align:center;color:var(--muted);">載入中…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header-bar">
+    <h5>最新新聞列表</h5>
+    <span class="pill pill-gray" id="newsCountPill">0 筆</span>
+  </div>
+  <div class="card-body">
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:52px;"><input id="newsPickAll" type="checkbox" onchange="togglePickAll(this.checked)" /></th>
+            <th style="width:78px;">ID</th>
+            <th>標題</th>
+            <th style="width:160px;">主題</th>
+            <th style="width:110px;">狀態</th>
+            <th style="width:170px;">建立時間</th>
+            <th style="width:250px;">操作</th>
+          </tr>
+        </thead>
+        <tbody id="newsTableBody">
+          <tr><td colspan="7" style="text-align:center;color:var(--muted);">載入中…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ── 文章詳情抽屜 ──────────────────────────────────────── -->
+<div id="articleDrawerOverlay"
+     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;"
+     onclick="closeArticleDetail()"></div>
+
+<aside id="articleDrawer"
+       style="display:none;position:fixed;top:0;right:0;bottom:0;
+              width:min(740px,100vw);background:var(--bg-card,#fff);
+              box-shadow:-6px 0 32px rgba(0,0,0,.2);z-index:1001;
+              overflow-y:auto;flex-direction:column;">
+
+  <!-- 抽屜頂欄 -->
+  <div style="position:sticky;top:0;background:var(--bg-card,#fff);z-index:2;
+              padding:16px 20px 12px;border-bottom:1px solid var(--border,#e2e8f0);
+              display:flex;align-items:flex-start;gap:12px;">
+    <div style="flex:1;min-width:0;">
+      <div id="drawerStatusBar" style="margin-bottom:6px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;"></div>
+      <h2 id="drawerTitle" style="margin:0 0 4px;font-size:18px;line-height:1.4;font-weight:700;color:var(--text,#1e293b);"></h2>
+      <p id="drawerSubtitle" style="margin:0;font-size:13px;color:var(--muted);line-height:1.5;"></p>
+    </div>
+    <button onclick="closeArticleDetail()"
+            style="background:none;border:1px solid var(--border,#e2e8f0);
+                   border-radius:6px;cursor:pointer;font-size:16px;
+                   color:var(--muted);padding:4px 10px;line-height:1;flex-shrink:0;"
+            title="關閉">✕</button>
+  </div>
+
+  <!-- 抽屜主體 -->
+  <div id="drawerBody" style="padding:20px 24px 40px;">
+    <div style="text-align:center;color:var(--muted);padding:60px 0;">載入中…</div>
+  </div>
+</aside>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script>
+var URL_AI_NEWS_LIST = "{% url 'app_user_keyword_llm_report:api_ai_news_admin_list' %}";
+var URL_AI_NEWS_GENERATE = "{% url 'app_user_keyword_llm_report:api_generate_ai_news' %}";
+var URL_AI_NEWS_MODEL_OPTIONS = "{% url 'app_user_keyword_llm_report:api_ai_news_model_options' %}";
+var URL_AI_NEWS_DETAIL_BASE = "{% url 'app_user_keyword_llm_report:api_ai_news_detail' 0 %}".replace('/0/', '/__ID__/');
+var URL_AI_NEWS_TOGGLE_BASE = "{% url 'app_user_keyword_llm_report:api_ai_news_toggle_status' 0 %}".replace('/0/', '/__ID__/');
+var URL_AI_NEWS_DELETE_BASE = "{% url 'app_user_keyword_llm_report:api_ai_news_delete' 0 %}".replace('/0/', '/__ID__/');
+var URL_DISCORD_STATUS = "{% url 'app_crawler_admin:api_ai_news_discord_status' %}";
+var URL_DISCORD_PUSH_WEEKLY = "{% url 'app_crawler_admin:api_ai_news_discord_push_weekly' %}";
+var URL_DISCORD_PUSH_ARTICLE = "{% url 'app_crawler_admin:api_ai_news_discord_push_article' %}";
+var URL_DISCORD_PUSH_ARTICLES = "{% url 'app_crawler_admin:api_ai_news_discord_push_articles' %}";
+var _modelCatalog = [];
+var _modelById = {};
+
+function getCsrf() {
+  var m = document.cookie.match(/csrftoken=([^;]+)/);
+  return m ? m[1] : '';
+}
+
+function escHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function setHint(msg, tone) {
+  var el = document.getElementById('generateHint');
+  el.textContent = msg;
+  if (tone === 'err') el.style.color = 'var(--negative)';
+  else if (tone === 'ok') el.style.color = 'var(--positive)';
+  else el.style.color = 'var(--muted)';
+}
+
+function renderRows(items) {
+  var body = document.getElementById('newsTableBody');
+  document.getElementById('newsCountPill').textContent = items.length + ' 筆';
+  document.getElementById('newsPickAll').checked = false;
+  if (!items.length) {
+    body.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);">目前尚無資料</td></tr>';
+    return;
+  }
+
+  var html = '';
+  items.forEach(function (item) {
+    var statusLabel = item.status === 'published' ? '已發布' : '草稿';
+    var pillClass = item.status === 'published' ? 'pill pill-green' : 'pill pill-gray';
+    html += ''
+      + '<tr>'
+      + '<td><input type="checkbox" class="news-pick" value="' + item.id + '" /></td>'
+      + '<td>#' + item.id + '</td>'
+      + '<td style="cursor:pointer;" onclick="openArticleDetail(' + item.id + ')" title="點擊查看全文">'
+      + '<span style="color:var(--accent,#7c6fe0);font-weight:500;">' + escHtml(item.title || '') + '</span>'
+      + '</td>'
+      + '<td style="font-size:12px;color:var(--muted);">' + escHtml(item.query || '') + '</td>'
+      + '<td><span class="' + pillClass + '">' + statusLabel + '</span></td>'
+      + '<td>' + escHtml(item.created_at || '') + '</td>'
+      + '<td>'
+      + '<button class="btn btn-sm btn-outline-secondary" onclick="openArticleDetail(' + item.id + ')">查看</button> '
+      + '<button class="btn btn-sm btn-outline-secondary" onclick="toggleStatus(' + item.id + ')">切換發布</button> '
+      + '<button class="btn btn-sm btn-outline-primary" onclick="pushArticleToDiscord(' + item.id + ')">推播至 Discord</button> '
+      + '<button class="btn btn-sm btn-danger" onclick="deleteNews(' + item.id + ')">刪除</button>'
+      + '</td>'
+      + '</tr>';
+  });
+  body.innerHTML = html;
+}
+
+function loadNewsList() {
+  fetch(URL_AI_NEWS_LIST + '?limit=30')
+    .then(function (r) { return r.json(); })
+    .then(function (data) { renderRows(data.items || []); })
+    .catch(function () {
+      document.getElementById('newsTableBody').innerHTML =
+        '<tr><td colspan="7" style="text-align:center;color:var(--negative);">清單載入失敗</td></tr>';
+    });
+}
+
+function togglePickAll(checked) {
+  var picks = document.querySelectorAll('.news-pick');
+  picks.forEach(function (el) { el.checked = checked; });
+}
+
+function getPickedArticleIds() {
+  var picks = document.querySelectorAll('.news-pick:checked');
+  return Array.from(picks).map(function (el) { return Number(el.value); }).filter(Boolean);
+}
+
+function renderModelMeta(modelId) {
+  var model = _modelById[modelId];
+  var el = document.getElementById('aiModelMeta');
+  if (!model) {
+    el.textContent = '模型資訊不可用';
+    return;
+  }
+  var providerLabel = model.provider === 'claude' ? 'Claude' : 'Gemini';
+  var providerPill = model.provider === 'claude' ? 'pill pill-blue' : 'pill pill-accent';
+  var attrs = (model.attrs || []).map(function (attr) {
+    return '<span class="pill pill-gray">屬性：' + escHtml(attr) + '</span>';
+  }).join(' ');
+  var imagePill = '<span class="pill pill-green">封面圖：Gemini 固定</span>';
+  var costPill = '<span class="pill pill-gray">成本：' + escHtml(model.cost_label || '$$') + '</span>';
+  el.innerHTML = ''
+    + '<span class="' + providerPill + '">供應商：' + providerLabel + '</span> '
+    + (attrs ? (attrs + ' ') : '')
+    + costPill + ' '
+    + imagePill;
+}
+
+function loadModelOptions() {
+  fetch(URL_AI_NEWS_MODEL_OPTIONS)
+    .then(function (r) { return r.json().then(function (d) { return { status: r.status, data: d }; }); })
+    .then(function (resp) {
+      if (resp.status >= 400 || resp.data.error) {
+        setHint('模型清單載入失敗，改用預設模型。', 'err');
+        return;
+      }
+      var items = resp.data.items || [];
+      var select = document.getElementById('aiTextModel');
+      if (!items.length) {
+        select.innerHTML = '<option value="">預設模型</option>';
+        renderModelMeta('');
+        return;
+      }
+      _modelCatalog = items;
+      _modelById = {};
+      items.forEach(function (item) { _modelById[item.id] = item; });
+      select.innerHTML = items.map(function (item) {
+        return '<option value="' + item.id + '">' + item.label + '</option>';
+      }).join('');
+      var defaultId = resp.data.default_model_id || items[0].id;
+      select.value = _modelById[defaultId] ? defaultId : items[0].id;
+      renderModelMeta(select.value);
+      select.addEventListener('change', function () { renderModelMeta(this.value); });
+    })
+    .catch(function () {
+      setHint('模型清單載入失敗，請稍後重試。', 'err');
+    });
+}
+
+function generateNews() {
+  var query = document.getElementById('aiQuery').value.trim();
+  if (query.length < 2) {
+    setHint('請輸入至少 2 個字的主題描述。', 'err');
+    return;
+  }
+  setHint('AI 新聞生成中，請稍候…', 'none');
+
+  fetch(URL_AI_NEWS_GENERATE, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': getCsrf()
+    },
+    body: JSON.stringify({
+      query: query,
+      category: document.getElementById('aiCategory').value,
+      source: document.getElementById('aiSource').value,
+      weeks: document.getElementById('aiWeeks').value,
+      topk: document.getElementById('aiTopk').value,
+      model_id: document.getElementById('aiTextModel').value,
+      auto_publish: document.getElementById('aiPublish').checked
+    })
+  })
+    .then(function (r) { return r.json().then(function (d) { return { status: r.status, data: d }; }); })
+    .then(function (resp) {
+      if (resp.status >= 400 || resp.data.error) {
+        setHint('生成失敗：' + (resp.data.error || ('HTTP ' + resp.status)), 'err');
+        return;
+      }
+      var n = resp.data.news || {};
+      var modeLabel = n.query_mode === 'natural_language' ? '自然語言模式' : '關鍵詞模式';
+      var terms = (n.search_terms || []).join('、');
+      var suffix = terms ? ('｜檢索詞：' + terms) : '';
+      var modelLabel = (((n.text_model || {}).label) || '預設模型');
+      setHint('完成（' + modeLabel + ' / ' + modelLabel + '）：' + (n.title || 'AI 新聞已建立') + suffix, 'ok');
+      loadNewsList();
+      if (document.getElementById('aiPushDiscord').checked && n.id) {
+        pushArticleToDiscord(n.id, true);
+      }
+    })
+    .catch(function (err) {
+      setHint('生成失敗：' + err, 'err');
+    });
+}
+
+function toggleStatus(id) {
+  fetch(URL_AI_NEWS_TOGGLE_BASE.replace('__ID__', id), {
+    method: 'POST',
+    headers: {'X-CSRFToken': getCsrf()}
+  })
+    .then(function (r) { return r.json().then(function (d) { return {status: r.status, data: d}; }); })
+    .then(function (resp) {
+      if (resp.status >= 400 || resp.data.error) {
+        setHint('狀態切換失敗：' + (resp.data.error || ('HTTP ' + resp.status)), 'err');
+        return;
+      }
+      setHint('狀態已更新。', 'ok');
+      loadNewsList();
+    })
+    .catch(function () { setHint('狀態切換失敗。', 'err'); });
+}
+
+function deleteNews(id) {
+  if (!confirm('確定要刪除這則 AI 新聞？')) return;
+  fetch(URL_AI_NEWS_DELETE_BASE.replace('__ID__', id), {
+    method: 'POST',
+    headers: {'X-CSRFToken': getCsrf()}
+  })
+    .then(function (r) { return r.json().then(function (d) { return {status: r.status, data: d}; }); })
+    .then(function (resp) {
+      if (resp.status >= 400 || resp.data.error) {
+        setHint('刪除失敗：' + (resp.data.error || ('HTTP ' + resp.status)), 'err');
+        return;
+      }
+      setHint('已刪除。', 'ok');
+      loadNewsList();
+    })
+    .catch(function () { setHint('刪除失敗。', 'err'); });
+}
+
+function renderDiscordStatus(data) {
+  var botPill = document.getElementById('discordBotPill');
+  if (data.bot && data.bot.running) {
+    botPill.className = 'pill pill-green';
+    botPill.textContent = 'Bot 運行中 (PID ' + (data.bot.pid || '—') + ')';
+  } else {
+    botPill.className = 'pill pill-gray';
+    botPill.textContent = 'Bot 未運行（推播任務會自動建立臨時連線）';
+  }
+
+  var targets = data.targets || [];
+  var targetEl = document.getElementById('discordTargetSummary');
+  if (!targets.length) {
+    targetEl.innerHTML = '<span style="color:var(--negative);">尚無推播目標</span>（請至 UMA Info Portal 設定推播頻道）';
+  } else {
+    targetEl.textContent = targets.length + ' 個伺服器：' + targets.map(function (t) { return t.guild_name; }).join('、');
+  }
+
+  var activeEl = document.getElementById('discordActiveTask');
+  var task = data.active_news_task;
+  if (task) {
+    activeEl.innerHTML = '<span class="pill pill-gray">#' + task.id + ' ' + (task.summary || task.status) + ' (' + task.progress_pct + '%)</span>';
+    document.getElementById('btnWeeklyPush').disabled = true;
+  } else {
+    activeEl.textContent = '無';
+    document.getElementById('btnWeeklyPush').disabled = false;
+  }
+
+  var logs = data.recent_logs || [];
+  var logBody = document.getElementById('discordLogBody');
+  if (!logs.length) {
+    logBody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);">尚無推播紀錄</td></tr>';
+    return;
+  }
+  var html = '';
+  logs.forEach(function (log) {
+    var pill = log.status === 'sent' ? 'pill pill-green' : (log.status === 'failed' ? 'pill pill-red' : 'pill pill-gray');
+    var statusLabel = log.status === 'sent' ? '已推播' : (log.status === 'failed' ? '失敗' : '待推播');
+    html += ''
+      + '<tr>'
+      + '<td>' + (log.created_at || '') + '</td>'
+      + '<td>' + (log.guild_name || '—') + '</td>'
+      + '<td><span class="' + pill + '">' + statusLabel + '</span></td>'
+      + '<td style="font-size:12px;color:var(--muted);">' + (log.preview || '') + '</td>'
+      + '</tr>';
+  });
+  logBody.innerHTML = html;
+}
+
+function loadDiscordStatus() {
+  fetch(URL_DISCORD_STATUS)
+    .then(function (r) { return r.json().then(function (d) { return { status: r.status, data: d }; }); })
+    .then(function (resp) {
+      if (resp.status >= 400 || resp.data.error) {
+        document.getElementById('discordTargetSummary').textContent = '載入失敗';
+        return;
+      }
+      renderDiscordStatus(resp.data);
+    })
+    .catch(function () {
+      document.getElementById('discordLogBody').innerHTML =
+        '<tr><td colspan="4" style="text-align:center;color:var(--negative);">Discord 狀態載入失敗</td></tr>';
+    });
+}
+
+function pushWeeklyToDiscord() {
+  if (!confirm('確定要推播週報摘要至所有已設定的 Discord 伺服器？')) return;
+  document.getElementById('btnWeeklyPush').disabled = true;
+  fetch(URL_DISCORD_PUSH_WEEKLY, {
+    method: 'POST',
+    headers: {'X-CSRFToken': getCsrf()}
+  })
+    .then(function (r) { return r.json().then(function (d) { return { status: r.status, data: d }; }); })
+    .then(function (resp) {
+      if (resp.status >= 400 || resp.data.error) {
+        setHint('週報推播失敗：' + (resp.data.error || ('HTTP ' + resp.status)), 'err');
+        document.getElementById('btnWeeklyPush').disabled = false;
+        return;
+      }
+      var msg = resp.data.status === 'already_running'
+        ? '已有推播任務進行中（#' + resp.data.run.id + '）'
+        : '週報推播任務已啟動（#' + resp.data.run.id + '）';
+      setHint(msg, 'ok');
+      loadDiscordStatus();
+      pollDiscordTask();
+    })
+    .catch(function (err) {
+      setHint('週報推播失敗：' + err, 'err');
+      document.getElementById('btnWeeklyPush').disabled = false;
+    });
+}
+
+function pushArticleToDiscord(articleId, silent) {
+  if (!silent && !confirm('確定要將新聞 #' + articleId + ' 推播至 Discord？')) return;
+  fetch(URL_DISCORD_PUSH_ARTICLE, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': getCsrf()
+    },
+    body: JSON.stringify({article_id: articleId})
+  })
+    .then(function (r) { return r.json().then(function (d) { return { status: r.status, data: d }; }); })
+    .then(function (resp) {
+      if (resp.status >= 400 || resp.data.error) {
+        if (!silent) setHint('推播失敗：' + (resp.data.error || ('HTTP ' + resp.status)), 'err');
+        return;
+      }
+      var msg = resp.data.status === 'already_running'
+        ? '已有推播任務進行中，請稍候再試'
+        : '新聞 #' + articleId + ' 推播任務已啟動（#' + resp.data.run.id + '）';
+      if (!silent) setHint(msg, 'ok');
+      loadDiscordStatus();
+      pollDiscordTask();
+    })
+    .catch(function (err) {
+      if (!silent) setHint('推播失敗：' + err, 'err');
+    });
+}
+
+function pushSelectedArticlesToDiscord() {
+  var articleIds = getPickedArticleIds();
+  if (!articleIds.length) {
+    setHint('請先勾選要推播的新聞。', 'err');
+    return;
+  }
+  if (!confirm('確定要批次推播 ' + articleIds.length + ' 篇新聞至所有已設定的 Discord 伺服器？')) return;
+  document.getElementById('btnBatchPush').disabled = true;
+  fetch(URL_DISCORD_PUSH_ARTICLES, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': getCsrf()
+    },
+    body: JSON.stringify({article_ids: articleIds})
+  })
+    .then(function (r) { return r.json().then(function (d) { return { status: r.status, data: d }; }); })
+    .then(function (resp) {
+      document.getElementById('btnBatchPush').disabled = false;
+      if (resp.status >= 400 || resp.data.error) {
+        setHint('批次推播失敗：' + (resp.data.error || ('HTTP ' + resp.status)), 'err');
+        return;
+      }
+      var msg = resp.data.status === 'already_running'
+        ? '已有推播任務進行中，請稍候再試'
+        : '批次推播任務已啟動（#' + resp.data.run.id + '，共 ' + articleIds.length + ' 篇）';
+      setHint(msg, 'ok');
+      loadDiscordStatus();
+      pollDiscordTask();
+    })
+    .catch(function (err) {
+      document.getElementById('btnBatchPush').disabled = false;
+      setHint('批次推播失敗：' + err, 'err');
+    });
+}
+
+/* ── 文章詳情抽屜 ──────────────────────────────────────── */
+function openArticleDetail(id) {
+  var overlay = document.getElementById('articleDrawerOverlay');
+  var drawer  = document.getElementById('articleDrawer');
+  overlay.style.display = '';
+  drawer.style.display  = 'flex';
+  document.getElementById('drawerTitle').textContent    = '載入中…';
+  document.getElementById('drawerSubtitle').textContent = '';
+  document.getElementById('drawerStatusBar').innerHTML  = '';
+  document.getElementById('drawerBody').innerHTML =
+    '<div style="text-align:center;color:var(--muted);padding:60px 0;">載入中…</div>';
+  document.body.style.overflow = 'hidden';
+
+  fetch(URL_AI_NEWS_DETAIL_BASE.replace('__ID__', id))
+    .then(function (r) { return r.json().then(function (d) { return { status: r.status, data: d }; }); })
+    .then(function (resp) {
+      if (resp.status >= 400 || resp.data.error) {
+        document.getElementById('drawerBody').innerHTML =
+          '<div style="color:var(--negative,#e53e3e);padding:20px;">載入失敗：'
+          + escHtml(resp.data.error || ('HTTP ' + resp.status)) + '</div>';
+        return;
+      }
+      _renderArticleDrawer(resp.data);
+    })
+    .catch(function () {
+      document.getElementById('drawerBody').innerHTML =
+        '<div style="color:var(--negative,#e53e3e);padding:20px;">載入失敗，請稍後再試。</div>';
+    });
+}
+
+function closeArticleDetail() {
+  document.getElementById('articleDrawerOverlay').style.display = 'none';
+  document.getElementById('articleDrawer').style.display        = 'none';
+  document.body.style.overflow = '';
+}
+
+function _renderArticleDrawer(a) {
+  var statusLabel = a.status === 'published' ? '已發布' : '草稿';
+  var pillClass   = a.status === 'published' ? 'pill pill-green' : 'pill pill-gray';
+
+  document.getElementById('drawerStatusBar').innerHTML =
+    '<span class="' + pillClass + '">' + statusLabel + '</span>'
+    + '<span style="color:var(--muted);font-size:11px;">建立於 ' + escHtml(a.created_at) + '</span>'
+    + '<span style="color:var(--muted);font-size:11px;">更新於 ' + escHtml(a.updated_at) + '</span>';
+  document.getElementById('drawerTitle').textContent    = a.title    || '';
+  document.getElementById('drawerSubtitle').textContent = a.subtitle || '';
+
+  var html = '';
+
+  /* 封面圖 */
+  if (a.cover_image_url) {
+    html += '<div style="margin-bottom:18px;border-radius:8px;overflow:hidden;">'
+      + '<img src="' + escHtml(a.cover_image_url) + '" alt="封面圖"'
+      + ' style="width:100%;max-height:300px;object-fit:cover;display:block;"'
+      + ' onerror="this.parentElement.style.display=\'none\'" />'
+      + '</div>';
+  }
+
+  /* 摘要區塊 */
+  if (a.summary) {
+    html += '<div style="background:var(--bg-hover,#f0f4ff);'
+      + 'border-left:3px solid var(--accent,#7c6fe0);'
+      + 'padding:10px 14px;border-radius:0 6px 6px 0;'
+      + 'margin-bottom:18px;font-size:13px;'
+      + 'color:var(--text,#334155);line-height:1.7;">'
+      + escHtml(a.summary)
+      + '</div>';
+  }
+
+  /* 正文（placeholder；markdown 稍後注入） */
+  html += '<div id="drawerContent" style="font-size:14px;line-height:1.85;color:var(--text,#334155);"></div>';
+
+  /* 來源連結 */
+  var links = Array.isArray(a.source_links) ? a.source_links : [];
+  if (links.length) {
+    html += '<div style="margin-top:24px;border-top:1px solid var(--border,#e2e8f0);padding-top:14px;">'
+      + '<div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px;">'
+      + '參考來源（' + links.length + ' 筆）</div>'
+      + '<ol style="margin:0;padding-left:18px;font-size:12px;line-height:1.9;">';
+    links.forEach(function (link) {
+      if (typeof link === 'string') {
+        html += '<li><a href="' + escHtml(link) + '" target="_blank" rel="noopener"'
+          + ' style="color:var(--accent,#7c6fe0);word-break:break-all;">'
+          + escHtml(link) + '</a></li>';
+      } else if (link && link.url) {
+        html += '<li><a href="' + escHtml(link.url) + '" target="_blank" rel="noopener"'
+          + ' style="color:var(--accent,#7c6fe0);">'
+          + escHtml(link.title || link.url) + '</a></li>';
+      }
+    });
+    html += '</ol></div>';
+  }
+
+  /* 生成參數（折疊） */
+  html += '<details style="margin-top:18px;">'
+    + '<summary style="cursor:pointer;font-size:12px;color:var(--muted);user-select:none;">生成參數</summary>'
+    + '<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">'
+    + '<span class="pill pill-gray">主題：' + escHtml(a.query)    + '</span>'
+    + '<span class="pill pill-gray">類別：' + escHtml(a.category) + '</span>'
+    + '<span class="pill pill-gray">來源：' + escHtml(a.source)   + '</span>'
+    + '<span class="pill pill-gray">週數：' + a.weeks             + '</span>'
+    + '<span class="pill pill-gray">參考數：' + a.topk            + '</span>'
+    + '<span class="pill pill-gray">建立者：' + escHtml(a.created_by) + '</span>'
+    + '</div></details>';
+
+  document.getElementById('drawerBody').innerHTML = html;
+
+  /* 渲染 Markdown 正文 */
+  var contentEl = document.getElementById('drawerContent');
+  if (typeof marked !== 'undefined') {
+    contentEl.innerHTML = marked.parse(a.content || '');
+  } else {
+    contentEl.innerHTML =
+      '<pre style="white-space:pre-wrap;font-family:inherit;margin:0;">'
+      + escHtml(a.content || '') + '</pre>';
+  }
+}
+
+/* ESC 鍵關閉抽屜 */
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape') closeArticleDetail();
+});
+
+var _discordPollTimer = null;
+function pollDiscordTask() {
+  if (_discordPollTimer) clearInterval(_discordPollTimer);
+  var ticks = 0;
+  _discordPollTimer = setInterval(function () {
+    ticks += 1;
+    loadDiscordStatus();
+    if (ticks >= 60) clearInterval(_discordPollTimer);
+  }, 3000);
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+  loadModelOptions();
+  loadNewsList();
+  loadDiscordStatus();
+});
+</script>
+{% endblock %}

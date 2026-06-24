@@ -1,0 +1,313 @@
+{% extends 'base.html' %} {% block title %}
+  賽馬娘公告聲量觀測站
+{% endblock %} {% block content %}
+  <div class="col-lg-12">
+    <h1>賽馬娘公告聲量觀測站</h1>
+    <p>針對你輸入的關鍵詞，分析其在賽馬娘遊戲公告中的熱門程度與出現頻率</p>
+  </div>
+  <div class="col-lg-6 mb-2">
+    <!-- 輸入條件區塊開始 -->
+    <div class="card">
+      <div class="card-header">
+        <h3 class="h6 text-uppercase mb-0">輸入條件</h3>
+      </div>
+      <div class="card-body">
+        <div class="mb-3 row">
+          <label class="col-md-3 col-form-label">關心哪個關鍵詞?</label>
+          <div class="col-md-9">
+            <input id="input_keyword" name="userkey" value="限定 卡池" class="form-control" />
+            <div class="form-text text-muted">全文搜尋關鍵字，可輸入多個，空白隔開。任何角色名、活動名稱、遊戲詞彙皆可。</div>
+          </div>
+        </div>
+
+        <div class="mb-3 row">
+          <label class="col-sm-3 col-form-label">條件</label>
+
+          <div class="col-md-9 mb-3">
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" id="cond_and" value="and" name="condradio" />
+              <label class="form-check-label" for="cond_and">and</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" id="cond_or" value="or" name="condradio" checked />
+              <label class="form-check-label" for="cond_or">or</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="mb-3 row">
+          <label class="col-sm-3 col-form-label" for="select_cate">公告類別</label>
+          <div class="col-md-9">
+            <select id="select_cate" class="form-select">
+              <option value="全部" selected>全部</option>
+              <optgroup label="bilibili">
+                <option value="活動">活動</option>
+                <option value="卡池">卡池</option>
+                <option value="競賽">競賽</option>
+                <option value="系統">系統</option>
+              </optgroup>
+              <optgroup label="巴哈姆特 (bahamut)">
+                <option value="情報">情報</option>
+                <option value="心得">心得</option>
+                <option value="討論">討論</option>
+                <option value="攻略">攻略</option>
+                <option value="公告">公告</option>
+                <option value="問題">問題</option>
+                <option value="閒聊">閒聊</option>
+                <option value="繪圖">繪圖</option>
+                <option value="繪畫">繪畫</option>
+                <option value="史實">史實</option>
+                <option value="整理">整理</option>
+                <option value="小說">小說</option>
+              </optgroup>
+              <option value="其他">其他</option>
+            </select>
+          </div>
+        </div>
+        <div class="mb-3 row">
+          <label class="col-md-3 col-form-label">最近多少周?</label>
+          <div class="col-md-9">
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" id="wk1" value="1" name="wkradio" />
+              <label class="form-check-label" for="wk1">1</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" id="wk2" value="2" name="wkradio" checked />
+              <label class="form-check-label" for="wk2">2</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" id="wk3" value="3" name="wkradio" />
+              <label class="form-check-label" for="wk3">3</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" id="wk4" value="4" name="wkradio" />
+              <label class="form-check-label" for="wk4">4</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" id="wk6" value="6" name="wkradio" />
+              <label class="form-check-label" for="wk6">6</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" id="wk8" value="8" name="wkradio" />
+              <label class="form-check-label" for="wk8">8</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" id="wk12" value="12" name="wkradio" />
+              <label class="form-check-label" for="wk12">12</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" id="wk52" value="52" name="wkradio" checked />
+              <label class="form-check-label" for="wk52">52</label>
+            </div>
+            <div class="form-text text-muted">以最新資料時間為準，往前推多少周?</div>
+          </div>
+        </div>
+        <div class="mb-3 row">
+          <label class="col-sm-3 col-form-label">資料來源</label>
+          <div class="col-md-9">
+            <select id="select_source" class="form-select form-select-sm" style="max-width:200px">
+              <option value="all">全部來源</option>
+              <option value="bilibili">Bilibili BWIKI</option>
+              <option value="bahamut">巴哈姆特</option>
+              <option value="udn">聯合新聞網</option>
+              <option value="ettoday">ETtoday</option>
+              <option value="gamme">宅宅新聞</option>
+            </select>
+          </div>
+        </div>
+        <div class="mb-3 row">
+          <div class="col-md-9 ms-auto">
+            <button type="button" id="btn_ok" class="btn btn-primary">查詢</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- 輸入區塊結束 -->
+
+  <!-- 顯示區塊 -->
+  <div class="col-lg-6 mb-2">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="h6 text-uppercase mb-0">出現頻率以時間呈現</h3>
+      </div>
+      <div class="card-body">
+        <small>觀察每個時間點有多少篇遊戲公告提到該關鍵詞（聲量大小）</small>
+        <div class="row">
+          <canvas id="keyword_time_line_chart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- 區塊結束 -->
+
+  <!-- 同時出現的關鍵字區塊 -->
+  <div class="col-lg-6 mb-2">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="h6 text-uppercase mb-0">熱門程度：有幾篇遊戲公告提到它?</h3>
+      </div>
+      <div class="card-body">
+        <ul id="keyword_article_count"></ul>
+      </div>
+    </div>
+  </div>
+  <!-- 區塊結束 -->
+
+  <!-- 熱門程度區塊 -->
+  <div class="col-lg-6 mb-2">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="h6 text-uppercase mb-0">熱門程度:提到它的次數?</h3>
+      </div>
+      <div class="card-body">
+        <ul id="keyword_frequency"></ul>
+      </div>
+    </div>
+  </div>
+  <!-- 區塊結束 -->
+{% endblock %} {% block extra_js %}
+  <!-- 這裡的java scrip等頁面初始化之後才載入與執行 -->
+  <!-- chartjs圖js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.13.0/moment.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.3/Chart.min.js"></script>
+  <!-- 程式碼區 -->
+  <script>
+    call_ajax()
+    
+    //**按鈕事件
+    $('#btn_ok').on('click', function () {
+      call_ajax()
+    }) //event function
+    
+    $('#select_cate').on('change', function () {
+      call_ajax()
+    }) //event function
+    
+    $("input[name='wkradio']").on('change', function () {
+      call_ajax()
+    }) //event function
+    
+    $("input[name='condradio']").on('change', function () {
+      call_ajax()
+    }) //event function
+    
+    $('#select_source').on('change', function () { call_ajax() })
+
+    function call_ajax() {
+      const userkey = $('#input_keyword').val()
+      const weeks   = $("input[name='wkradio']:checked").val()
+      const cate    = $('#select_cate').val()
+      const cond    = $("input[name='condradio']:checked").val()
+      const source  = $('#select_source').val()
+    
+      if (userkey.length < 2) {
+        alert('輸入關鍵字不可空白或小於兩個中文字!')
+        return 0
+      }
+    
+      $.ajax({
+        type: 'POST',
+        url: 'api_get_top_userkey/',
+        data: {
+          userkey: userkey,
+          cate:    cate,
+          weeks:   weeks,
+          cond:    cond,
+          source:  source,
+        }, // pass to server
+        success: function (received) {
+          //若查無資料，顯示提醒訊息
+          if (received['error']) {
+            alert('檢索異常回應: ' + received['error'])
+            return 0
+          }
+
+          //顯示同時出現的關鍵字與文章數量
+          const article_count = received['key_occurrence_cat']
+          console.log(article_count)
+          $('#keyword_article_count').empty()
+    
+          //將內容加上li標籤附加起來顯示
+          for (let key in article_count) {
+            let paste = '<li>' + key + ':' + article_count[key] + '</li>'
+            $('#keyword_article_count').append(paste)
+          }
+          //同理顯示熱門程度
+          const kwfreq = received['key_freq_cat']
+          console.log(kwfreq)
+          $('#keyword_frequency').empty()
+          for (let key in kwfreq) {
+            let paste = '<li>' + key + ':' + kwfreq[key] + '</li>'
+            $('#keyword_frequency').append(paste)
+          }
+    
+          // 繪製圖表 linechart
+          const data_key_time_freq = received['key_time_freq']
+          console.log(data_key_time_freq)
+          showtimechart(data_key_time_freq)
+        } //function
+      }) //ajax
+    } //call_ajax()
+    
+    // 宣告全域變數用於存放圖表實例
+    let line_chart = null
+    
+    function showtimechart(data_key_time_freq) {
+      //取得繪圖元件
+      const ctx_key_time = document.getElementById('keyword_time_line_chart').getContext('2d')
+    
+      const myoptions = {
+        type: 'line',
+        data: {
+          datasets: [
+            {
+              label: 's2',
+              borderColor: 'red',
+              data: data_key_time_freq // your data here!
+            }
+          ]
+        },
+        options: {
+          legend: {
+            display: false
+          },
+          scales: {
+            xAxes: [
+              {
+                type: 'time',
+                time: {
+                  unit: 'day',
+                  displayFormats: {
+                    //day: 'DD-MM-YYYY'
+                    day: 'MM/DD'
+                  }
+                }
+              }
+            ],
+            yAxes: [
+              {
+                ticks: {
+                  beginAtZero: true
+                },
+                display: true,
+                scaleLabel: {
+                  display: true,
+                  labelString: '出現次數'
+                }
+              }
+            ]
+          }
+        }
+      }
+    
+      // 檢查並清除舊圖
+      if (line_chart) {
+        line_chart.destroy()
+      }
+    
+      // 畫新圖
+      line_chart = new Chart(ctx_key_time, myoptions)
+    }
+  </script>
+{% endblock %}

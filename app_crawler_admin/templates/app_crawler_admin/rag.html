@@ -1,0 +1,216 @@
+{% extends "app_crawler_admin/base_admin.html" %}
+{% block title %}RAG 知識庫管理{% endblock %}
+{% block nav_rag %}active{% endblock %}
+
+{% block extra_css %}
+<style>
+  .index-status-badge{
+    display:inline-flex;align-items:center;gap:8px;
+    padding:8px 16px;border-radius:8px;font-size:14px;font-weight:600;
+  }
+  .index-ok {background:#dcfce7;color:#166534;border:1px solid #bbf7d0;}
+  .index-no {background:#fee2e2;color:#991b1b;border:1px solid #fecaca;}
+  [data-theme="dark"] .index-ok{background:#14532d;color:#86efac;border-color:#166534;}
+  [data-theme="dark"] .index-no{background:#450a0a;color:#fca5a5;border-color:#991b1b;}
+
+  .kb-file-item{
+    display:flex;align-items:center;gap:10px;padding:8px 0;
+    border-bottom:1px solid var(--border);
+  }
+  .kb-file-item:last-child{border-bottom:none;}
+  .kb-file-icon{font-size:18px;}
+  .kb-file-name{flex:1;font-size:13px;font-weight:500;}
+  .kb-file-size{font-size:11px;color:var(--muted);}
+
+  #rebuildLog{
+    background:#0d1117;color:#c9d1d9;border-radius:8px;
+    padding:12px;font-family:monospace;font-size:11.5px;line-height:1.8;
+    height:150px;overflow-y:auto;display:none;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-row">
+    <div>
+      <h1>🧠 RAG 知識庫管理</h1>
+      <p class="page-subtitle">FAISS 向量索引 · 知識庫文件管理 · 一鍵重建索引</p>
+    </div>
+    <div class="all-btn-row">
+      <button class="btn btn-accent btn-sm" id="rebuildBtn" onclick="rebuildIndex()">🔄 重建索引</button>
+      <button class="btn btn-outline-secondary btn-sm" onclick="refreshStatus()">↻ 重新整理</button>
+    </div>
+  </div>
+</div>
+
+<!-- 索引狀態 -->
+<div class="card mb-3">
+  <div class="card-header-bar"><h5>📦 FAISS 索引狀態</h5></div>
+  <div class="card-body">
+    <div class="d-flex align-items-center gap-3 flex-wrap mb-3">
+      <div class="index-status-badge {% if rag_data.index_exists %}index-ok{% else %}index-no{% endif %}">
+        {% if rag_data.index_exists %}✅ 索引正常{% else %}❌ 索引不存在{% endif %}
+      </div>
+    </div>
+    <div class="stat-cards">
+      <div class="stat-card {% if rag_data.index_exists %}c-green{% else %}c-gray{% endif %}">
+        <div class="val">{{ rag_data.vector_count|default:"—" }}</div>
+        <div class="lbl">向量數量</div>
+      </div>
+      <div class="stat-card">
+        <div class="val">{{ rag_data.index_size_kb|default:0 }} <span style="font-size:12px;">KB</span></div>
+        <div class="lbl">索引大小</div>
+      </div>
+      <div class="stat-card">
+        <div class="val" style="font-size:13px;">{{ rag_data.index_mtime|default:"—" }}</div>
+        <div class="lbl">最後建立時間</div>
+      </div>
+      <div class="stat-card c-accent">
+        <div class="val">{{ rag_data.kb_files|length }}</div>
+        <div class="lbl">知識庫文件數</div>
+      </div>
+    </div>
+
+    {% if not rag_data.index_exists %}
+    <div class="callout mt-3">
+      ⚠️ FAISS 索引不存在。請點擊「重建索引」按鈕，或在終端機執行：
+      <code>python app_rag_uma/build_index.py</code>
+    </div>
+    {% endif %}
+
+    <div id="rebuildLog" class="mt-3"></div>
+  </div>
+</div>
+
+<!-- 知識庫文件清單 -->
+<div class="card mb-3">
+  <div class="card-header-bar">
+    <h5>📄 knowledge_base/ 文件清單</h5>
+    <span style="font-size:11px;color:var(--muted);">共 {{ rag_data.kb_files|length }} 份文件</span>
+  </div>
+  <div class="card-body">
+    {% if rag_data.kb_files %}
+    <div>
+      {% for f in rag_data.kb_files %}
+      <div class="kb-file-item">
+        <span class="kb-file-icon">
+          {% if f.name|slice:"-3:" == ".md" %}📝
+          {% elif f.name|slice:"-4:" == ".pdf" %}📕
+          {% else %}📄{% endif %}
+        </span>
+        <span class="kb-file-name">{{ f.name }}</span>
+        <span class="kb-file-size">{{ f.size_kb }} KB</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div style="text-align:center;padding:16px;color:var(--muted);font-size:13px;">
+      knowledge_base/ 目錄為空或不存在。
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- 上傳知識庫文件 -->
+<div class="card mb-3">
+  <div class="card-header-bar"><h5>⬆️ 上傳知識庫文件</h5></div>
+  <div class="card-body">
+    <form id="uploadForm" onsubmit="uploadFile(event)">
+      <div class="mb-3">
+        <label class="form-label">選擇文件（.md / .txt / .pdf）</label>
+        <input type="file" name="kb_file" id="kbFile" class="form-control"
+               accept=".md,.txt,.pdf" required>
+      </div>
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-success btn-sm">上傳文件</button>
+        <span id="uploadStatus" style="font-size:12px;color:var(--muted);align-self:center;"></span>
+      </div>
+    </form>
+    <div class="callout mt-3">
+      💡 上傳文件後，需要<strong>重建索引</strong>才能讓 RAG 系統讀取新文件。
+    </div>
+  </div>
+</div>
+
+<!-- 索引建立說明 -->
+<div class="card mb-3">
+  <div class="card-header-bar"><h5>📘 索引建立流程說明</h5></div>
+  <div class="card-body">
+    <div style="font-size:13px;line-height:2;">
+      <strong>build_index.py 執行步驟：</strong><br>
+      1️⃣ 讀取 <code>knowledge_base/</code> 所有 .md / .txt 文件<br>
+      2️⃣ 依 chunk_size=512 / overlap=64 切分文本<br>
+      3️⃣ 呼叫 <code>gemini-embedding-001</code> 生成 768 維嵌入向量<br>
+      4️⃣ 建立 <code>FAISS.IndexFlatIP</code> 並寫入磁碟<br>
+      5️⃣ 輸出：<code>app_rag_uma/index/uma_knowledge.faiss</code> + <code>uma_knowledge_texts.pkl</code>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function refreshStatus(){
+  fetch('/crawler-admin/api/rag_status/')
+    .then(r=>r.json())
+    .then(d=>{
+      console.log('RAG status:', d);
+      // 可選：動態更新頁面元素
+    }).catch(()=>{});
+}
+
+function rebuildIndex(){
+  var btn = document.getElementById('rebuildBtn');
+  var log = document.getElementById('rebuildLog');
+  if(!confirm('確定要重建 RAG 索引？需要 GEMINI_API_KEY 且約 1-5 分鐘。')) return;
+  btn.disabled = true; btn.textContent = '重建中…';
+  log.style.display = 'block';
+  log.textContent = '正在啟動 build_index.py…\n';
+
+  fetch('/crawler-admin/api/rebuild_rag/', {method:'POST', headers:{'X-CSRFToken': getCsrf()}})
+    .then(r=>r.json())
+    .then(d=>{
+      if(d.status === 'started'){
+        log.textContent += '✅ 已非同步啟動。請等待 1-5 分鐘後重新整理頁面確認索引狀態。\n';
+      } else {
+        log.textContent += '❌ 錯誤：' + (d.error||'未知錯誤') + '\n';
+      }
+      btn.disabled = false; btn.textContent = '🔄 重建索引';
+    }).catch(function(e){
+      log.textContent += '❌ 啟動失敗：' + e + '\n';
+      btn.disabled = false; btn.textContent = '🔄 重建索引';
+    });
+}
+
+function uploadFile(e){
+  e.preventDefault();
+  var status = document.getElementById('uploadStatus');
+  var fileInput = document.getElementById('kbFile');
+  if(!fileInput.files.length){ return; }
+  var fd = new FormData();
+  fd.append('kb_file', fileInput.files[0]);
+  status.textContent = '上傳中…';
+  fetch('/crawler-admin/api/upload_kb/', {
+    method:'POST',
+    headers:{'X-CSRFToken': getCsrf()},
+    body: fd,
+  }).then(r=>r.json())
+    .then(d=>{
+      if(d.ok){
+        status.textContent = '✅ 上傳成功：' + d.filename;
+        fileInput.value = '';
+        setTimeout(()=>location.reload(), 1500);
+      } else {
+        status.textContent = '❌ ' + (d.error||'上傳失敗');
+      }
+    }).catch(()=>{ status.textContent = '❌ 上傳失敗，請稍後再試。'; });
+}
+
+function getCsrf(){
+  var m = document.cookie.match(/csrftoken=([^;]+)/);
+  return m ? m[1] : '';
+}
+</script>
+{% endblock %}

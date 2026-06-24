@@ -1,0 +1,223 @@
+{% extends "app_crawler_admin/base_admin.html" %}
+{% block title %}排程管理{% endblock %}
+{% block nav_schedule %}active{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-row">
+    <div>
+      <h1>排程管理</h1>
+      <p class="page-subtitle">設定各來源爬蟲的自動執行時間（APScheduler）</p>
+    </div>
+    <button class="btn btn-accent" data-bs-toggle="modal" data-bs-target="#schedModal">+ 新增排程</button>
+  </div>
+</div>
+
+<div class="callout" style="margin-bottom:18px;font-size:12px;">
+  <strong>Cron 格式說明：</strong> <code>分 時 日 月 週</code>
+  ·  例：<code>0 2 * * *</code>（每日 02:00）、<code>0 4 * * 0</code>（每週日 04:00）、<code>30 */6 * * *</code>（每 6 小時）
+</div>
+
+<div class="card">
+  <div class="card-header-bar">
+    <h5>現有排程</h5>
+    <span class="pill pill-gray" id="schedStatus">載入中…</span>
+  </div>
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>來源</th><th>名稱</th><th>模式</th><th>Cron 表達式</th>
+          <th>下次執行（估計）</th><th>狀態</th><th>操作</th>
+        </tr>
+      </thead>
+      <tbody id="schedBody">
+        <tr><td colspan="7" style="text-align:center;color:var(--muted)">載入中…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Cron 快速選擇參考 -->
+<div class="card" style="margin-top:16px;">
+  <div class="card-header-bar"><h5>常用 Cron 範本</h5></div>
+  <div class="card-body">
+    <div style="display:flex;flex-wrap:wrap;gap:8px;">
+      <button class="btn btn-outline-secondary btn-sm" style="font-family:monospace;font-size:12px;" onclick="setCronInput('0 2 * * *')">0 2 * * * <small class="d-block text-muted">每日 02:00</small></button>
+      <button class="btn btn-outline-secondary btn-sm" style="font-family:monospace;font-size:12px;" onclick="setCronInput('0 4 * * *')">0 4 * * * <small class="d-block text-muted">每日 04:00</small></button>
+      <button class="btn btn-outline-secondary btn-sm" style="font-family:monospace;font-size:12px;" onclick="setCronInput('0 6 * * *')">0 6 * * * <small class="d-block text-muted">每日 06:00</small></button>
+      <button class="btn btn-outline-secondary btn-sm" style="font-family:monospace;font-size:12px;" onclick="setCronInput('0 2 * * 0')">0 2 * * 0 <small class="d-block text-muted">每週日 02:00</small></button>
+      <button class="btn btn-outline-secondary btn-sm" style="font-family:monospace;font-size:12px;" onclick="setCronInput('0 */6 * * *')">0 */6 * * * <small class="d-block text-muted">每 6 小時</small></button>
+      <button class="btn btn-outline-secondary btn-sm" style="font-family:monospace;font-size:12px;" onclick="setCronInput('0 0 * * 1')">0 0 * * 1 <small class="d-block text-muted">每週一 00:00</small></button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block modals %}
+<!-- Modal: 新增/編輯排程（放在 <main> 外，與 backdrop 同層，避免 z-index stacking context 衝突）-->
+<div class="modal fade" id="schedModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">新增 / 編輯排程</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">來源</label>
+          <select class="form-select" id="sf-source">
+            {% for src in sources %}
+            <option value="{{ src }}">{{ src }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">模式</label>
+          <select class="form-select" id="sf-mode">
+            <option value="daily">每日</option>
+            <option value="weekly">每週</option>
+            <option value="interval">固定間隔</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Cron 表達式</label>
+          <input type="text" class="form-control" id="sf-cron" value="0 2 * * *"
+                 placeholder="分 時 日 月 週 （e.g. 0 2 * * *）" />
+          <div class="form-text" style="font-size:11px;">支援標準 5 欄 cron 格式。點擊上方範本快速填入。</div>
+        </div>
+        <div class="mb-3 form-check">
+          <input type="checkbox" class="form-check-input" id="sf-enabled" checked>
+          <label class="form-check-label" for="sf-enabled">立即啟用</label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">取消</button>
+        <button class="btn btn-accent" onclick="saveSchedule()">儲存排程</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+var SOURCE_META = {{ source_meta|safe }};
+
+function cronToDesc(expr){
+  var p=expr.trim().split(/\s+/);
+  if(p.length<5) return expr;
+  var m=p[0],h=p[1],dom=p[2],mo=p[3],dow=p[4];
+  if(dom==='*'&&mo==='*'){
+    if(dow==='*') return '每日 '+h.padStart(2,'0')+':'+m.padStart(2,'0');
+    var days=['日','一','二','三','四','五','六'];
+    return '每週'+( days[parseInt(dow)]||dow )+' '+h.padStart(2,'0')+':'+m.padStart(2,'0');
+  }
+  return expr;
+}
+
+function loadSchedules(){
+  $.get('/crawler-admin/api/schedule/', function(d){
+    var rows=d.schedules||[];
+    document.getElementById('schedStatus').textContent='共 '+rows.length+' 筆';
+    if(!rows.length){
+      document.getElementById('schedBody').innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--muted)">目前無排程，點擊「新增排程」建立</td></tr>';
+      return;
+    }
+    var html=rows.map(function(s){
+      var meta=SOURCE_META[s.source]||{};
+      var stPill=s.enabled?'<span class="pill pill-green">啟用</span>':'<span class="pill pill-yellow">停用</span>';
+      var toggle=s.enabled
+        ?'<button class="btn btn-outline-secondary btn-sm" onclick="toggleSched(\''+s.source+'\','+JSON.stringify(s)+',false)">停用</button>'
+        :'<button class="btn btn-success btn-sm" onclick="toggleSched(\''+s.source+'\','+JSON.stringify(s)+',true)">啟用</button>';
+      return '<tr>'
+        +'<td><code>'+s.source+'</code></td>'
+        +'<td>'+( meta.name||s.source )+'</td>'
+        +'<td>'+s.mode+'</td>'
+        +'<td><code>'+s.cron_expr+'</code><br><small class="text-muted">'+cronToDesc(s.cron_expr)+'</small></td>'
+        +'<td style="font-size:12px;color:var(--muted)">—</td>'
+        +stPill
+        +'<td>'
+          +'<div style="display:flex;gap:6px;">'
+          +'<button class="btn btn-outline-secondary btn-sm" onclick="editSched('+JSON.stringify(s)+')">編輯</button>'
+          +toggle
+          +'<button class="btn btn-outline-danger btn-sm" onclick="deleteSched(\''+s.source+'\')">刪除</button>'
+          +'</div>'
+        +'</td>'
+        +'</tr>';
+    }).join('');
+    document.getElementById('schedBody').innerHTML=html;
+  });
+}
+
+function setCronInput(v){
+  document.getElementById('sf-cron').value=v;
+  var el = document.getElementById('schedModal');
+  // 若 modal 已開啟則僅更新值，不重複呼叫 show() 以免疊加 backdrop
+  if (el.classList.contains('show')) return;
+  bootstrap.Modal.getOrCreateInstance(el).show();
+}
+
+function editSched(s){
+  document.getElementById('sf-source').value  = s.source;
+  document.getElementById('sf-mode').value    = s.mode;
+  document.getElementById('sf-cron').value    = s.cron_expr;
+  document.getElementById('sf-enabled').checked = s.enabled;
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('schedModal')).show();
+}
+
+function getCsrf(){
+  var m = document.cookie.match(/csrftoken=([^;]+)/);
+  return m ? m[1] : '';
+}
+
+function toggleSched(src, s, enabled){
+  s.enabled = enabled;
+  $.ajax({
+    url:'/crawler-admin/api/schedule/save/',
+    type:'POST', contentType:'application/json',
+    headers: {'X-CSRFToken': getCsrf()},
+    data:JSON.stringify({source:src, mode:s.mode, cron_expr:s.cron_expr, enabled:enabled}),
+    success:function(r){ if(r.ok) loadSchedules(); else alert('儲存失敗：'+r.error); },
+    error:  function(xhr){ alert('排程更新失敗（HTTP '+xhr.status+'），請重試'); }
+  });
+}
+
+function saveSchedule(){
+  var data={
+    source:   document.getElementById('sf-source').value,
+    mode:     document.getElementById('sf-mode').value,
+    cron_expr:document.getElementById('sf-cron').value.trim(),
+    enabled:  document.getElementById('sf-enabled').checked,
+  };
+  if(!data.cron_expr){ alert('請填寫 Cron 表達式'); return; }
+  $.ajax({
+    url:'/crawler-admin/api/schedule/save/',
+    type:'POST', contentType:'application/json',
+    headers: {'X-CSRFToken': getCsrf()},
+    data:JSON.stringify(data),
+    success:function(r){
+      if(r.ok){
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('schedModal')).hide();
+        loadSchedules();
+      } else { alert('儲存失敗：'+r.error); }
+    },
+    error: function(xhr){ alert('排程儲存失敗（HTTP '+xhr.status+'），請重試'); }
+  });
+}
+
+function deleteSched(src){
+  if(!confirm('確定刪除 '+src+' 的排程？')) return;
+  $.ajax({
+    url:'/crawler-admin/api/schedule/delete/'+src+'/',
+    type:'POST',
+    headers: {'X-CSRFToken': getCsrf()},
+    success:function(r){ if(r.ok) loadSchedules(); else alert('刪除失敗：'+r.error); },
+    error:  function(xhr){ alert('排程刪除失敗（HTTP '+xhr.status+'），請重試'); }
+  });
+}
+
+loadSchedules();
+</script>
+{% endblock %}

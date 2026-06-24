@@ -1,0 +1,358 @@
+{% extends 'base.html' %} 
+{% block title %} 台北市長選情聲量觀測站 {% endblock %} 
+{% block content %}
+<div class="col-lg-12">
+  <h1>台北市長選情聲量觀測站</h1>
+  <h3>黃珊珊、蔣萬安、陳時中人氣聲量大PK</h3>
+</div>
+
+<!-- 顯示區塊-->
+<div class="col-lg-6 mb-2">
+  <div class="card">
+    <div class="card-header">
+      <h3 class="h6 text-uppercase mb-0">
+        排行榜(資料週期:資料截止時間的前4周)
+      </h3>
+    </div>
+    <div class="card-body">
+      <div class="row">
+        <!-- Leaderboard Container -->
+        <div class="container">
+          <!-- Leaderboard Heading -->
+          <h3>網路聲量</h3>
+          <p>
+            網路聲量是什麼？
+            計算新聞報導提及的文章則數，聲量越高表示能見度越高。<br />
+            感染力、影響力、正向力、或溫度:指的是正負面情緒新聞篇數所占之百分比。
+          </p>
+          <hr />
+          <!-- Leaderboard Content -->
+          <div id="leaderboardDisplay"></div>
+        </div>
+        <!-- /.container -->
+      </div>
+    </div>
+  </div>
+</div>
+<!-- 區塊結束-->
+
+<!-- 繪圖區塊-->
+<div class="col-lg-6 mb-2">
+  <div class="card">
+    <div class="card-header">
+      <h3 class="h6 text-uppercase mb-0">聲量分布情況</h3>
+    </div>
+    <div class="card-body">
+      <!-- description -->
+      <h3>依據新聞類別統計網路聲量</h3>
+      <p>在哪一類別的新聞中被報導最多篇?</p>
+      <hr />
+      <canvas id="pkBarChart"></canvas>
+    </div>
+  </div>
+</div>
+<!-- 區塊結束-->
+
+<!-- 顯示區塊-->
+<div class="col-lg-12 mb-2">
+  <div class="card">
+    <div class="card-header">
+      <h3 class="h6 text-uppercase mb-0">聲量變化比較</h3>
+    </div>
+    <div class="card-body">
+      <!-- description -->
+      <h3>依據時間顯示總聲量的變化</h3>
+      <p>在哪個時間點被新聞報導最多?</p>
+      <hr />
+      <canvas id="pkLineChart"></canvas>
+    </div>
+  </div>
+</div>
+<!-- 區塊結束-->
+{% endblock %} {% block extra_js %}
+<!-- 繪製line chart會用到，必須在chartjs之前先載入 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.13.0/moment.min.js"></script>
+<!-- chartjs圖js-->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.3/Chart.min.js"></script>
+
+<script>
+  /*
+  (1) 讀取方式1: 使用jinga2語法  ==> 參考"陳時中聲量我最大APP"的寫法。
+  How does JavaScript read data from Django server
+  讀取Django後端送過來的資料 變數名稱寫在兩個大括弧中間即可
+  加上 safe 是不讓Django做一些特殊符號的代號轉換(XSS安全機制)，否則我們拿到的資料顯示會有錯誤
+  
+
+  (2) 讀取方式2: 使用Ajax方式，此法可以做到前後端完全分離 ==> 我們最喜歡用的方式，這也是業界的標準做法。
+  pk_data ={
+           'list_freq_daily_line_chart': list_freq_daily_line_chart,
+           'list_pkNames': list_pkNames,
+           'list_colors': list_colors,
+           'list_photos': list_photos,
+           'list_freq_news_category': list_freq_news_category,
+           'list_category': selectedCategories,
+           'list_sentiInfo': list_sentimentInfo,
+           'list_total_articles': list_total_articles,
+           'list_total_frequency': list_total_frequency
+           }
+  */
+
+  call_ajax();
+
+  function call_ajax() {
+    $.ajax({
+      type: "POST",
+      url: "api_get_taipei_mayor_data/", //It's good to use relative path
+      // url: "/taipeimayor/api_get_taipei_mayor_data/", //Use full path (Not recommend)
+
+      data: {}, // pass to server
+      success: function (received) {
+        //console.log("ok");
+        const list_freq_daily_line_chart =
+          received["list_freq_daily_line_chart"];
+        const list_pkNames = received["list_pkNames"];
+        const list_photos = received["list_photos"];
+        const list_freq_news_category = received["list_freq_news_category"];
+        const list_categories = received["list_category"];
+        const list_sentiInfo = received["list_sentiInfo"];
+        const list_total_articles = received["list_total_articles"];
+        const list_total_frequency = received["list_total_frequency"];
+
+        const list_colors = received["list_colors"];
+
+        //const list_colors = [
+        //  "rgba(0,128,0,0.2)",
+        //  "rgba(0,255,255,0.2)",
+        //  "rgba(0,0,255,0.2)",
+        //];
+
+        // (1)Display leader board
+        displayLeaderboard(
+          list_pkNames,
+          list_sentiInfo,
+          list_photos,
+          list_sentiInfo,
+          list_freq_news_category,
+          list_total_articles,
+          list_total_frequency
+        );
+
+        // (2)Draw bar chart
+        drawBarChart(
+          list_pkNames,
+          list_freq_news_category,
+          list_colors,
+          list_categories
+        );
+
+        // (3)Draw line chart
+        drawLineChart(list_pkNames, list_freq_daily_line_chart, list_colors);
+      }, //function
+    }); //ajax
+  } //call_ajax()
+
+  //*****************
+  function displayLeaderboard(
+    list_pkNames,
+    list_sentiInfo,
+    list_photos,
+    list_sentiInfo,
+    list_freq_news_category,
+    list_total_articles,
+    list_total_frequency
+  ) {
+    //感染力的顏色
+    const textColor = ["text-danger", "text-secondary", "text-primary"]; //red, grey, light blue
+
+    const new_div = document.createElement("div"); //<div>   </div>
+    for (let i = 0; i < list_pkNames.length; i++) {
+      // 感染力字串 填入影響力正 中立 負 三個數值
+      let senti_str = ""; //感染力字串
+      for (let j = 0; j <= 2; j++) {
+        senti_str += `<span class="${textColor[j]}">${list_sentiInfo[i][j]}%</span>`;
+      }
+    
+      let html_snippet = `<div class="row">
+                              <div class="col-md-3">
+                                  <a href="#">
+                                      <img class="img-fluid rounded mb-3 mb-md-0" src="${list_photos[i]}">
+                                  </a>
+                              </div>
+                              <div class="col-md-8">
+                                  <h3>${list_pkNames[i]}</h3>
+                                  <p>總聲量:${list_total_articles[i]}篇 ${list_total_frequency[i]}次</p>
+                                  <p>感染力:${senti_str}(正面,中立,負面情緒)</p>
+                              </div>
+                          </div>
+                          <hr>`;
+    
+      // insert the html snippet into the div block
+      // 也可用 new_div.appendChild(html_snippet)
+      new_div.innerHTML += html_snippet;
+    } //for
+    // 一個大區塊div內部附加上去前述3個小區塊div，也可用.innerHTML
+    document.getElementById("leaderboardDisplay").appendChild(new_div);
+  } //function
+
+  Chart.defaults.global.defaultFontSize = 15; //chart.js內定字型大小，可以自行調整
+
+  //*********************
+  // 繪製長條圖的函數
+  function drawBarChart(
+    list_pkNames,
+    list_freq_news_category,
+    list_colors,
+    list_categories
+  ) {
+    const chartElem = document.getElementById("pkBarChart");
+    //$('#pkBarChart')
+
+    // data for drawing 準備資料: 新聞篇數值 顏色 標籤 等數據 一筆一筆塞進去陣列裡
+    /*
+    在新聞類別的頻率次數數值:
+    [[743, 110, 1, 8, 578, 1], [133, 44, 0, 2, 80, 2], [111, 93, 0, 0, 16, 0]]
+    */
+
+    let pkDataToDraw = new Array();
+    for (let i = 0; i < 3; i++) {
+      pkDataToDraw.push({
+        label: list_pkNames[i], //標題 陳時中 黃珊珊  蔣萬安
+        backgroundColor: list_colors[i],
+
+        data: list_freq_news_category[i], //各自在新聞類別的頻率次數數值[743, 110, 1, 8, 578, 1]
+        borderWidth: 1,
+      });
+    }
+
+    let chartSpec = {
+      type: "bar",
+      data: {
+        labels: list_categories, //['全部', '政治', '兩岸', '產經', '生活', '社會']
+        datasets: pkDataToDraw, //前面整理好的繪圖的資料放在此
+      },
+      options: {
+        legend: {
+          display: true,
+        },
+      }, //options
+    }; // let chartSpec
+
+    // 立即繪圖並回傳
+    return new Chart(chartElem, chartSpec);
+  }
+
+  //*********************
+  // Line chart function
+  function drawLineChart(
+    list_pkNames,
+    list_freq_daily_line_chart,
+    list_colors
+  ) {
+    // 取得Line圖的元素element
+    const lineChartElem = document
+      .getElementById("pkLineChart")
+      .getContext("2d");
+
+    // data for drawing 準備三條線圖的資料
+    /*
+    在陣列中置放多組資料，例如:第1組資料細節格式如下:
+     [
+      {label:'陳時中', 
+        borderColor:'green', 
+        data:[{'x': '2022-01-29', 'y': 5},{'x': '2022-01-30', 'y': 5},{'x': '2022-01-31', 'y': 2}]},
+      { label:'黃珊珊'   第2組資料細節 }, 
+      { label:'蔣萬安'   第3組資料細節 }, 
+     ]  
+
+    */
+    // 置放畫線的資料 (有多條線圖，置放於array中)
+    let pkDataToDraw = new Array();
+    for (let i = 0; i < 3; i++) {
+      pkDataToDraw.push({
+        label: list_pkNames[i], //圖標題名稱
+        borderColor: list_colors[i], //線條顏色
+        //borderColor: randomColors(1),
+        borderWidth: 1,
+        backgroundColor: list_colors[i], //背景底色
+        //backgroundColor: randomColors(1),
+
+        data: list_freq_daily_line_chart[i], //x y資料置放於data
+      });
+    }
+
+    //定義繪圖規格
+    let chartSpec = {
+      type: "line",
+      data: {
+        datasets: pkDataToDraw, //繪圖的多條線資料放在此
+      },
+      options: {
+        legend: {
+          display: true,
+        },
+        scales: {
+          xAxes: [
+            {
+              type: "time", // 時間軸型態的X軸
+              time: {
+                unit: "day", //'week' //這裡定義以天或周為單位
+                displayFormats: {
+                  //day: 'DD-MM-YYYY'
+                  day: "MM/DD",
+                },
+              },
+            },
+          ],
+          yAxes: [
+            {
+              ticks: {
+                beginAtZero: true, //從0開始
+                responsive: true, //符合響應式
+              },
+              display: true,
+              scaleLabel: {
+                display: true,
+                labelString: "篇數", //Y軸顯示新聞篇數
+              },
+            },
+          ],
+        }, //scales
+      }, //options
+    }; // let chart_spec
+
+    //此處不必將前圖destroy，因為只有重新載入頁面時才會畫出圖，重新載入頁面會清除所有的變數。
+
+    /* 檢查line_chart變數是否存在，如果存在，表示已經有之前畫的圖，必須要先清除之後，再畫新的圖。否則會有新舊圖重疊現象
+    用以下這種方式檢查與清除舊圖。window指的是這個頁面，這個頁面有很多變數存在，檢查line_chart是否存在，若有存在，必須要先清除之後，再畫新的圖。否則會有新舊圖重疊現象
+    if (window.time_line_chart) {
+      time_line_chart.destroy();
+    }
+    畫一張新圖(產生一個圖物件變數名稱為line_chart)
+    必須全域變數--注意:前面不要有let, var, const等修飾詞
+    理由: 我們要讓它存在於網頁全域變數，
+    這樣我們才方便判斷是否有前一次的圖，如果存在有，要刪除之，否則，很多張圖會疊在一起
+    */
+    //立即繪圖並回傳圖物件 (return可以刪去，不必回傳物件，沒用到)
+    new Chart(lineChartElem, chartSpec);
+    //return new Chart(lineChartElem, chartSpec);
+  }
+
+  // randomize color
+  function randomColors(length) {
+    var pool = [];
+    for (let i = 0; i < length; i++) {
+      pool.push(dynamicColors());
+    }
+
+    return pool;
+  }
+
+  function dynamicColors() {
+    // rgb + alpha(transparent color透明度) 透明度請自行調整 數字越小越透明
+    var r = Math.floor(Math.random() * 255);
+    var g = Math.floor(Math.random() * 255);
+    var b = Math.floor(Math.random() * 255);
+    return "rgba(" + r + "," + g + "," + b + ", 0.2)";
+  }
+</script>
+{% endblock %}

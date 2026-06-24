@@ -1,0 +1,389 @@
+{% extends 'base.html' %} {% block title %}
+  熱門命名實體
+{% endblock %} {% block content %}
+  <div class="col-lg-12">
+    <h1>熱門人物產品等命名實體分析</h1>
+    <p>哪個人物產品等被報導最多次?</p>
+  </div>
+  <!-- query criteria col-lg-6 card -->
+  <div class="col-lg-6 mb-5">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="h6 text-uppercase mb-0">篩選條件(資料週期:資料截止時間的前4周)</h3>
+      </div>
+      <div class="card-body">
+        <!-- NE names -->
+        <div class="mb-3 row">
+          <label class="col-sm-3 col-form-label">實體標記名稱</label>
+          <div class="col-md-9 mb-3">
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" value="8" name="nerradio" id="ner8" checked />
+              <label class="form-check-label" for="ner8">人名</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" value="9" name="nerradio" id="ner9" />
+              <label class="form-check-label" for="ner9">產品</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" value="4" name="nerradio" id="ner4" />
+              <label class="form-check-label" for="ner4">法律條文</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" value="0" name="nerradio" id="ner0" />
+              <label class="form-check-label" for="ner0">事件</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" value="7" name="nerradio" id="ner7" />
+              <label class="form-check-label" for="ner7">組織</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" value="10" name="nerradio" id="ner10" />
+              <label class="form-check-label" for="ner10">作品</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" value="5" name="nerradio" id="ner5" />
+              <label class="form-check-label" for="ner5">地理區</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" value="3" name="nerradio" id="ner3" />
+              <label class="form-check-label" for="ner3">語言</label>
+            </div>
+            <div class="form-text text-muted ms-3">請選擇詞類型</div>
+          </div>
+        </div>
+        <!-- form group -->
+        <!-- new category form group -->
+        <div class="mb-3 row">
+          <label class="col-sm-3 col-form-label">新聞類別</label>
+          <div class="col-md-9 mb-3">
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" value="0" name="cateradio" id="cate0" checked />
+              <label class="form-check-label" for="cate0">政治</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" value="1" name="cateradio" id="cate1" />
+              <label class="form-check-label" for="cate1">科技</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" value="2" name="cateradio" id="cate2" />
+              <label class="form-check-label" for="cate2">運動</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" value="3" name="cateradio" id="cate3" />
+              <label class="form-check-label" for="cate3">證卷</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" value="4" name="cateradio" id="cate4" />
+              <label class="form-check-label" for="cate4">產經</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" value="5" name="cateradio" id="cate5" />
+              <label class="form-check-label" for="cate5">娛樂</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" value="6" name="cateradio" id="cate6" />
+              <label class="form-check-label" for="cate6">生活</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" value="7" name="cateradio" id="cate7" />
+              <label class="form-check-label" for="cate7">國際</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" value="8" name="cateradio" id="cate8" />
+              <label class="form-check-label" for="cate8">社會</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" value="9" name="cateradio" id="cate9" />
+              <label class="form-check-label" for="cate9">文化</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" value="10" name="cateradio" id="cate10" />
+              <label class="form-check-label" for="cate10">兩岸</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" value="11" name="cateradio" id="cate11" />
+              <label class="form-check-label" for="cate11">全部</label>
+            </div>
+            <div class="form-text text-muted ms-3">請選擇新聞類別</div>
+          </div>
+        </div>
+        <!-- Select number of words -->
+        <div class="mb-3 row">
+          <label class="col-md-3 col-form-label">多少個熱門詞?</label>
+          <div class="col-md-9">
+            <input id="topk_keys" name="topk" value="30" class="form-control" />
+            <div class="form-text text-muted ms-3">內定值為30</div>
+          </div>
+        </div>
+        <!-- submit -->
+        <div class="mb-3 row">
+          <div class="col-md-9 ms-auto">
+            <button type="button" id="btn_ok" class="btn btn-primary">查詢</button>
+          </div>
+        </div>
+      </div>
+      <!-- card body -->
+    </div> <!-- card -->
+  </div> <!-- column -->
+  <!-- draw cloud chart -->
+  <div class="col-lg-6 mb-5">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="h6 text-uppercase mb-0">熱門關鍵字雲圖</h3>
+      </div>
+      <div class="card-body">
+        <div id="cloud"></div>
+      </div>
+    </div>
+  </div>
+  <!-- column -->
+  <!-- draw chart -->
+  <div class="col-lg-6 mb-5">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="h6 text-uppercase mb-0">熱門關鍵字繪圖</h3>
+      </div>
+      <div class="card-body">
+        <canvas id="mychart"></canvas>
+      </div>
+    </div>
+  </div>
+  <!-- column -->
+  <!-- display top words -->
+  <div class="col-lg-6 mb-5">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="h6 text-uppercase mb-0">熱門關鍵字</h3>
+      </div>
+      <div class="card-body">
+        <ul id="topkeys"></ul>
+      </div>
+    </div>
+  </div>
+  <!-- column -->
+{% endblock %} {% block extra_js %}
+  <!-- chartjs js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.3/Chart.min.js"></script>
+  <!--  word cloud chart ====
+    Here is the cloud chart script.
+    reference:http://bl.ocks.org/joews/9697914
+    reference:https://jsfiddle.net/x827g61m/
+    reference:https://www.d3-graph-gallery.com/wordcloud
+    src="https://rawgit.com/jasondavies/d3-cloud/master/build/d3.layout.cloud.js">
+    -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.4.11/d3.min.js"></script>
+  <script src="https://cdn.rawgit.com/jasondavies/d3-cloud/v1.2.1/build/d3.layout.cloud.js"></script>
+
+  <!-- Here are your js code -->
+  <script>
+    // Show the page with default setting when page is initialized.
+    call_ajax()
+    
+    //** submit event
+    $('#btn_ok').on('click', function () {
+      call_ajax()
+    }) //event function
+    
+    $("input[name='cateradio']").on('change', function () {
+      call_ajax()
+    }) //event function
+    
+    $("input[name='nerradio']").on('change', function () {
+      call_ajax()
+    }) //event function
+    
+    function call_ajax() {
+      // get user's input
+      const ner_value = $("input[name='nerradio']:checked").val()
+      console.log(ner_value)
+    
+      const cate = $("input[name='cateradio']:checked").val()
+    
+      var topk = $('#topk_keys').val()
+      console.log(topk)
+    
+      // send and get data
+      $.ajax({
+        type: 'POST',
+    
+        url: '/topner/api_get_ner_topword/',
+        data: {
+          news_category: cate,
+          topk: topk,
+          ner_value: ner_value
+        },
+        success: function (received) {
+          // clear previous top words
+          $('#topkeys').empty()
+          // clear previous cloud chart
+          $('#cloud').empty()
+    
+          console.log(received.data)
+          if (received.data.length == 0) {
+            $('#cloud').append('<h4>No Data!</h4>')
+            $('#topkeys').append('<h4>No Data!</h4>')
+            return
+          }
+    
+          const data_barchart = received.data.data_barchart
+          showChart(data_barchart)
+    
+          const wf_pairs = received.data.wf_pairs
+          showTopKeys(wf_pairs)
+    
+          topWordToDraw = received.data.data_cloud
+          drawCloud(topWordToDraw, '#cloud')
+        } //ajax function
+      }) //ajax
+    } //call_ajax
+    
+    //* 顯示關鍵詞資料函數
+    function showTopKeys(items) {
+      //先清除前一次的資料
+      $('#topkeys').empty()
+    
+      //將內容加上li標籤附加起來，顯示在顯示區"topkeys"
+      for (let i = 0; i < items.length; i++) {
+        let item_li = '<li>' + items[i] + '</li>'
+        $('#topkeys').append(item_li)
+      }
+    } //function
+    
+    //**繪圖函數showChart()
+    function showChart(chart_data) {
+      // 畫圖需要的數據資料
+      let values = chart_data.values
+      let labels = chart_data.labels
+      let category = chart_data.category
+    
+      //第1個變數: 餵給chart的資料
+      let data = {
+        labels: labels,
+        datasets: [
+          {
+            label: category,
+            data: values,
+            backgroundColor: randomColors(values.length),
+            borderColor: randomColors(values.length),
+            borderWidth: 1
+          }
+        ]
+      }
+    
+      //第2個變數: chart的選項  指定y坐標軸從零開始顯示
+      let options = {
+        scales: {
+          yAxes: [
+            {
+              ticks: {
+                beginAtZero: true
+              }
+            }
+          ]
+        }
+      }
+    
+      //取得在前面html區域欲顯示的圖代號
+      let canvas_mychrat = document.getElementById('mychart')
+    
+      //**先清除前一個圖 再繪新圖
+      // 可以印出barchart物件是否存在
+      // console.log(window.barchart);
+      //先清除前一個圖 再繪新圖 if 有以下兩種寫法皆可
+      // if (window.barchart)  //若存在則為true
+      // if (typeof (barchart) != "undefined"){
+      if (window.barchart) {
+        barchart.destroy()
+      }
+    
+      //**繪圖(產生一個圖物件變數名稱為barchart)
+      // 必須全域變數--注意:前面不要有let, var, const等修飾詞
+      // 理由: 我們要讓它存在於網頁全域變數，
+      // 這樣我們才方便判斷是否有前一次的圖，如果存在有，要刪除之，否則，很多張圖會疊在一起
+      barchart = new Chart(canvas_mychrat, {
+        type: 'bar',
+        data: data,
+        options: options
+      })
+    
+      //** 產生隨機顏色
+      function randomColors(num_colors) {
+        let colors = []
+    
+        for (let i = 0; i < num_colors; i++) {
+          let r = Math.floor(Math.random() * 255)
+          let g = Math.floor(Math.random() * 255)
+          let b = Math.floor(Math.random() * 255)
+          let rgb = `rgba(${r},${g},${b},0.5)` // (red, green, blue, alfa) alfa透明度
+    
+          colors.push(rgb)
+        }
+        return colors
+      }
+    } //show chart function
+    
+    //** cloud chart
+    function drawCloud(topWordToDraw, element_id) {
+      // You should set a proper box size to show cloud chart
+      const width = 400
+      const height = 400
+    
+      // First define your cloud data, using `text` and `size` properties:
+      // Next you need to use the layout script to calculate the placement, rotation and size of each word:
+      // Constructs a new cloud layout instance.
+      d3.layout
+        .cloud()
+        .size([width, height])
+        .words(topWordToDraw) //data for cloud chart
+        .rotate(function () {
+          //return ~~(Math.random() * 2) * 90; //~~1.5 => 1  (same as Math.floor(1.5))
+          return 30 // don't rotate
+        })
+        .font('Impact')
+        .fontSize(function (d) {
+          return d.size
+        })
+        .on('end', draw) //call function draw()
+        .start()
+    
+      // Finally implement `draw`, which performs the D3 drawing
+      // This function takes the output of 'layout' above and draw the words
+      function draw(words) {
+        const fill = d3.scale.category20()
+    
+        // append the svg object to the body of the page
+        d3.select(element_id)
+          .append('svg') // element_id such as "#cloud"
+          .attr('width', width)
+          .attr('height', height)
+          .append('g')
+          .attr('transform', 'translate(' + ~~(width / 2) + ',' + ~~(height / 2) + ')')
+          .selectAll('text')
+          .data(words)
+          .enter()
+          .append('text')
+          .style('font-size', function (d) {
+            return d.size + 'px'
+          })
+          .style('-webkit-touch-callout', 'none')
+          .style('-webkit-user-select', 'none')
+          .style('-khtml-user-select', 'none')
+          .style('-moz-user-select', 'none')
+          .style('-ms-user-select', 'none')
+          .style('user-select', 'none')
+          .style('cursor', 'default')
+          .style('font-family', 'Impact')
+          .style('fill', function (d, i) {
+            return fill(i)
+          })
+          .attr('text-anchor', 'middle')
+          .attr('transform', function (d) {
+            return 'translate(' + [d.x, d.y] + ')rotate(' + d.rotate + ')'
+          })
+          .text(function (d) {
+            return d.text
+          })
+      } //draw
+    } //drawCloud()
+  </script>
+{% endblock %}

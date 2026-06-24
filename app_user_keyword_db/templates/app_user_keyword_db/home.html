@@ -1,0 +1,453 @@
+{% extends 'base.html' %}
+{% load custom_filters %}
+{% block title %}全文檢索（DB版）{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* ── Page header ───────────────────────────────── */
+  .page-header { padding: 1.2rem 0 0.4rem; }
+  .page-header h2 { font-weight: 700; margin-bottom: 0.25rem; }
+
+  /* ── Search card ───────────────────────────────── */
+  .search-card { border-radius: 12px; }
+  .input-accent-wrap { position: relative; }
+  .input-accent-wrap::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 50%;
+    width: 0; height: 2px;
+    background: var(--color-accent);
+    border-radius: 2px;
+    transition: width 0.22s ease, left 0.22s ease;
+  }
+  .input-accent-wrap:focus-within::after { width: 100%; left: 0; }
+
+  /* ── Chart cards ───────────────────────────────── */
+  .chart-card { border-radius: 12px; }
+  .chart-card .card-header {
+    border-radius: 12px 12px 0 0;
+    font-size: 0.88rem;
+    font-weight: 600;
+    padding: 0.65rem 1rem;
+  }
+  .chart-card.anim-1 { animation: chart-popin 0.32s 0.05s cubic-bezier(0.25,0.46,0.45,0.94) both; }
+  .chart-card.anim-2 { animation: chart-popin 0.32s 0.14s cubic-bezier(0.25,0.46,0.45,0.94) both; }
+  .chart-card.anim-3 { animation: chart-popin 0.32s 0.22s cubic-bezier(0.25,0.46,0.45,0.94) both; }
+
+  /* ── News links list ───────────────────────────── */
+  .news-list { list-style: none; padding: 0; margin: 0; }
+  .news-list li {
+    padding: 0.55rem 0;
+    border-bottom: 1px solid var(--color-border);
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    font-size: 0.9rem;
+  }
+  .news-list li:last-child { border-bottom: none; }
+  .news-list .news-dot {
+    flex-shrink: 0;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--color-accent);
+    margin-top: 0.42rem;
+  }
+  .news-list a { color: var(--color-accent); text-decoration: none; }
+  .news-list a:hover { text-decoration: underline; opacity: 0.8; }
+  .news-count-badge {
+    display: inline-block;
+    font-size: 0.78rem;
+    padding: 1px 8px;
+    border-radius: 10px;
+    background: var(--color-accent-muted);
+    color: var(--color-accent);
+    font-weight: 600;
+    vertical-align: middle;
+    margin-left: 0.4rem;
+  }
+
+  /* ── Sentiment summary badge ───────────────────── */
+  #sentiSummary {
+    font-size: 0.82rem;
+    color: var(--color-text-secondary);
+    margin-top: 0.5rem;
+  }
+  .senti-badge {
+    display: inline-block;
+    padding: 0.15rem 0.55rem;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 0.8rem;
+    margin: 0 2px;
+  }
+  .senti-pos { background: color-mix(in srgb, var(--color-positive) 18%, transparent); color: var(--color-positive); }
+  .senti-neg { background: color-mix(in srgb, var(--color-negative) 18%, transparent); color: var(--color-negative); }
+
+  /* ── DB badge ──────────────────────────────────── */
+  .db-badge {
+    display: inline-block;
+    font-size: 0.72rem;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--color-positive) 18%, transparent);
+    color: var(--color-positive);
+    font-weight: 700;
+    vertical-align: middle;
+    margin-left: 0.5rem;
+    letter-spacing: 0.03em;
+  }
+
+  /* ── Empty state ───────────────────────────────── */
+  #emptyState { display: none; text-align: center; padding: 2.5rem 1rem; }
+  #emptyState .empty-icon { font-size: 2.4rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page header -->
+<div class="col-lg-12 page-header">
+  <h2>🗄️ 賽馬娘公告全文檢索
+    <span class="db-badge">SQLite DB</span>
+  </h2>
+  <p class="text-muted">以 SQLite 資料庫查詢，結果包含公告清單、時間頻率與情緒統計</p>
+</div>
+
+<!-- Search form -->
+<div class="col-lg-12 mb-3">
+  <div class="card search-card">
+    <div class="card-body py-3">
+      <div class="row g-2 align-items-end">
+
+        <div class="col-md-3">
+          <label class="form-label">關鍵字（空格分隔多個）</label>
+          <div class="input-accent-wrap">
+            <input id="inputKeyword" type="text" class="form-control"
+                   value="限定" placeholder="例：限定 周年">
+          </div>
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label">公告類別</label>
+          <div id="cateRadio">
+            {% for cate in "全部,活動,卡池,競賽,系統,其他"|split:"," %}
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" name="cate" value="{{ cate }}"
+                {% if cate == "全部" %}checked{% endif %}>
+              <label class="form-check-label">{{ cate }}</label>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="col-md-2">
+          <label class="form-label">AND / OR</label>
+          <select id="condSelect" class="form-select">
+            <option value="or" selected>OR（任一）</option>
+            <option value="and">AND（全含）</option>
+          </select>
+        </div>
+
+        <div class="col-md-2">
+          <label class="form-label">時間範圍（週）</label>
+          <div id="weeksRadio">
+            {% for w in "1,2,3,4,6,8,12,52"|split:"," %}
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" name="weeks" value="{{ w }}"
+                {% if w == "52" %}checked{% endif %}>
+              <label class="form-check-label">{{ w }}</label>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="col-md-2">
+          <label class="form-label">資料來源</label>
+          <select id="sourceSelect" class="form-select">
+            <option value="all">全部來源</option>
+            <option value="bilibili">Bilibili BWIKI</option>
+            <option value="bahamut">巴哈姆特</option>
+            <option value="udn">聯合新聞網</option>
+            <option value="ettoday">ETtoday</option>
+            <option value="gamme">宅宅新聞</option>
+          </select>
+        </div>
+
+        <div class="col-md-2">
+          <button id="queryBtn" class="btn btn-primary w-100" onclick="call_ajax()">查詢</button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Empty state -->
+<div class="col-lg-12" id="emptyState">
+  <div class="empty-state">
+    <div class="empty-icon">🗄️</div>
+    <p class="mt-2 mb-0" id="emptyMsg">查無相關公告，請嘗試其他關鍵字</p>
+  </div>
+</div>
+
+<!-- Charts & Results (hidden until data arrives) -->
+<div id="chartsRow" style="display:contents;">
+
+  <!-- 公告清單 -->
+  <div class="col-lg-7 mb-3">
+    <div class="card chart-card anim-1 h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="mb-0">相關公告清單</h6>
+        <span id="newsCountBadge" class="news-count-badge" style="display:none;"></span>
+      </div>
+      <div class="card-body" style="max-height:420px; overflow-y:auto;">
+        <div class="chart-skeleton" id="sk1" style="height:200px;"></div>
+        <div id="cw1" class="chart-canvas-wrap is-loading">
+          <ul class="news-list" id="newsLinksList"></ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 情緒分布 -->
+  <div class="col-lg-5 mb-3">
+    <div class="card chart-card anim-2 h-100">
+      <div class="card-header"><h6 class="mb-0">情緒分布（篇數）</h6></div>
+      <div class="card-body">
+        <div class="chart-skeleton" id="sk2" style="height:300px;"></div>
+        <div class="chart-canvas-wrap is-loading" id="cw2">
+          <div class="chart-fixed">
+            <canvas id="sentiPieChart"></canvas>
+          </div>
+          <div id="sentiSummary" class="text-center"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 時間頻率折線圖 -->
+  <div class="col-lg-12 mb-3">
+    <div class="card chart-card anim-3">
+      <div class="card-header"><h6 class="mb-0">關鍵字每日頻率趨勢</h6></div>
+      <div class="card-body">
+        <div class="chart-skeleton" id="sk3" style="height:340px;"></div>
+        <div class="chart-canvas-wrap is-loading" id="cw3">
+          <div class="chart-fixed chart-tall">
+            <canvas id="timeLineChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.13.0/moment.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.3/Chart.min.js"></script>
+<script>
+  var _pieChart = null, _lineChart = null;
+
+  /* ── Skeleton helpers ────────────────────────────────── */
+  function showLoading() {
+    ['sk1','sk2','sk3'].forEach(function(id) {
+      document.getElementById(id).style.display = 'block';
+    });
+    ['cw1','cw2','cw3'].forEach(function(id) {
+      var el = document.getElementById(id);
+      el.classList.remove('is-loaded');
+      el.classList.add('is-loading');
+    });
+    $('#newsLinksList').empty();
+    $('#newsCountBadge').hide();
+    $('#emptyState').hide();
+  }
+
+  function revealCharts() {
+    ['sk1','sk2','sk3'].forEach(function(id) {
+      document.getElementById(id).style.display = 'none';
+    });
+    ['cw1','cw2','cw3'].forEach(function(id, i) {
+      setTimeout(function() {
+        var el = document.getElementById(id);
+        el.classList.remove('is-loading');
+        el.classList.add('is-loaded');
+      }, i * 90);
+    });
+  }
+
+  function showEmpty(msg) {
+    ['sk1','sk2','sk3'].forEach(function(id) {
+      document.getElementById(id).style.display = 'none';
+    });
+    $('#emptyMsg').text(msg || '查無相關公告');
+    $('#emptyState').show();
+  }
+
+  /* ── AJAX ────────────────────────────────────────────── */
+  call_ajax();
+
+  function call_ajax() {
+    var userkey = $('#inputKeyword').val().trim();
+    var cate    = $('input[name="cate"]:checked').val() || '全部';
+    var cond    = $('#condSelect').val();
+    var weeks   = $('input[name="weeks"]:checked').val() || '52';
+
+    if (!userkey) { alert('請輸入關鍵字'); return; }
+
+    showLoading();
+
+    $.ajax({
+      type: 'POST',
+      url:  'api_get_userkey_data/',
+      data: { userkey: userkey, cate: cate, cond: cond, weeks: weeks, source: $('#sourceSelect').val() },
+      success: function(r) {
+        if (r.error) { showEmpty(r.error); return; }
+        renderNewsList(r.newslinks, r.num_articles);
+        drawPie(r.sentiCount);
+        drawTimeLine(r.key_time_freq);
+        revealCharts();
+        $('#newsCountBadge').text(r.num_articles + ' 篇').show();
+        $('#emptyState').hide();
+      },
+      error: function() { showEmpty('伺服器錯誤，請稍後再試'); }
+    });
+  }
+
+  /* ── News links renderer ─────────────────────────────── */
+  function renderNewsList(newslinks, total) {
+    var list = $('#newsLinksList').empty();
+    if (!newslinks || !newslinks.length) return;
+    newslinks.forEach(function(item) {
+      var li = $('<li></li>');
+      var dot = $('<span class="news-dot"></span>');
+      var title = item.title || '（無標題）';
+      var link  = item.link  || '';
+      var a = link
+        ? $('<a></a>').attr('href', link).attr('target', '_blank').attr('rel', 'noopener').text(title)
+        : $('<span></span>').text(title);
+      li.append(dot).append(a);
+      list.append(li);
+    });
+  }
+
+  /* ── Theme helper ────────────────────────────────────── */
+  function cssVar(name) {
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
+
+  Chart.defaults.global.defaultFontSize   = 14;
+  Chart.defaults.global.defaultFontColor  = cssVar('--color-text-secondary') || '#6B6560';
+  Chart.defaults.global.defaultFontFamily =
+    '"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif';
+
+  /* ── Pie chart ───────────────────────────────────────── */
+  function drawPie(sentiCount) {
+    if (_pieChart) _pieChart.destroy();
+    var pos   = (sentiCount && sentiCount['Positive']) || 0;
+    var neu   = (sentiCount && sentiCount['Neutral'])  || 0;
+    var neg   = (sentiCount && sentiCount['Negative']) || 0;
+    var total = pos + neu + neg;
+
+    var posColor = cssVar('--color-positive')     || '#2E9E6B';
+    var neuColor = cssVar('--color-neutral-tone') || '#8C8070';
+    var negColor = cssVar('--color-negative')     || '#D9503F';
+    var tc       = cssVar('--color-text-secondary') || '#6B6560';
+
+    _pieChart = new Chart(document.getElementById('sentiPieChart'), {
+      type: 'doughnut',
+      data: {
+        labels: [
+          '正面 ' + pos + '篇',
+          '中立 ' + neu + '篇',
+          '負面 ' + neg + '篇'
+        ],
+        datasets: [{
+          data: [pos, neu, neg],
+          backgroundColor: [posColor, neuColor, negColor],
+          borderColor: cssVar('--color-bg-surface') || '#fff',
+          borderWidth: 3,
+          hoverBorderWidth: 3
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutoutPercentage: 58,
+        legend: { position: 'bottom', labels: { fontColor: tc, fontSize: 13, padding: 14, usePointStyle: true } },
+        tooltips: { bodyFontSize: 13, titleFontSize: 13 }
+      }
+    });
+
+    var posP = total ? Math.round(pos / total * 100) : 0;
+    var negP = total ? Math.round(neg / total * 100) : 0;
+    $('#sentiSummary').html(
+      '共 <strong>' + total + '</strong> 篇　' +
+      '<span class="senti-badge senti-pos">正面 ' + posP + '%</span>' +
+      '<span class="senti-badge senti-neg">負面 ' + negP + '%</span>'
+    );
+  }
+
+  /* ── Line chart ─────────────────────────────────────── */
+  function drawTimeLine(timeData) {
+    if (_lineChart) _lineChart.destroy();
+    var tc    = cssVar('--color-text-secondary') || '#6B6560';
+    var weeks = parseInt($('input[name="weeks"]:checked').val()) || 52;
+
+    var xUnit, xFmt, xMax;
+    if (weeks <= 4)       { xUnit = 'day';   xFmt = { day:   'M/D'   }; xMax = 14; }
+    else if (weeks <= 12) { xUnit = 'week';  xFmt = { week:  'M/D週' }; xMax = 12; }
+    else                  { xUnit = 'month'; xFmt = { month: 'YY/MM' }; xMax = 13; }
+
+    var ctx  = document.getElementById('timeLineChart').getContext('2d');
+    var grad = ctx.createLinearGradient(0, 0, 0, 340);
+    grad.addColorStop(0, 'rgba(124,58,237,0.28)');
+    grad.addColorStop(1, 'rgba(124,58,237,0.02)');
+
+    _lineChart = new Chart(ctx, {
+        type: 'line',
+        data: { datasets: [{
+          label: '每日頻率',
+          data: timeData,
+          borderColor:     'rgba(124,58,237,0.95)',
+          backgroundColor: grad,
+          borderWidth: 2.5,
+          lineTension: 0.35,
+          fill: true,
+          pointBackgroundColor: 'rgba(124,58,237,1)',
+          pointBorderColor: '#fff',
+          pointBorderWidth: 1.5,
+          pointRadius: weeks <= 4 ? 4 : 0,
+          pointHoverRadius: 6
+        }]},
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          legend: { labels: { fontColor: tc, fontSize: 13, usePointStyle: true } },
+          tooltips: { mode: 'index', intersect: false, bodyFontSize: 13, titleFontSize: 13 },
+          scales: {
+            xAxes: [{
+              type: 'time',
+              time: { unit: xUnit, displayFormats: xFmt },
+              ticks: {
+                fontColor: tc,
+                fontSize: 12,
+                maxTicksLimit: xMax,
+                autoSkip: true,
+                maxRotation: 30,
+                minRotation: 0
+              },
+              gridLines: { color: 'rgba(128,128,128,0.10)', drawBorder: false }
+            }],
+            yAxes: [{
+              ticks: { beginAtZero: true, fontColor: tc, fontSize: 12, precision: 0 },
+              scaleLabel: { display: true, labelString: '篇數', fontColor: tc, fontSize: 13 },
+              gridLines: { color: 'rgba(128,128,128,0.10)', drawBorder: false }
+            }]
+          }
+        }
+      }
+    );
+  }
+</script>
+{% endblock %}

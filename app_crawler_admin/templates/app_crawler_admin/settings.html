@@ -1,0 +1,190 @@
+{% extends "app_crawler_admin/base_admin.html" %}
+{% block title %}爬蟲設定{% endblock %}
+{% block nav_settings %}active{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>爬蟲設定</h1>
+  <p class="page-subtitle">設定各來源爬蟲的執行參數，儲存後下次觸發時生效</p>
+</div>
+
+<div class="callout" style="margin-bottom:18px;font-size:12px;">
+  <strong>提示：</strong>Playwright 模式僅在伺服器已安裝 <code>playwright</code> 套件且執行過 <code>playwright install chromium</code> 的情況下才能使用。
+</div>
+
+<div id="settingsContainer">
+  <div style="text-align:center;padding:30px;color:var(--muted)">載入中…</div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+var SOURCE_META = {{ source_meta|safe }};
+var configs = {};
+
+/* 安全取值：避免 0 / false / '' 被 || 誤當 falsy 而套用預設值 */
+function def(val, fallback){ return (val !== undefined && val !== null) ? val : fallback; }
+
+/* 轉義 HTML 特殊字元，防止 user_agent 等欄位值破壞 HTML 結構 */
+function esc(str){
+  return String(str)
+    .replace(/&/g,'&amp;').replace(/"/g,'&quot;')
+    .replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function getCsrf(){
+  var m = document.cookie.match(/csrftoken=([^;]+)/);
+  return m ? m[1] : '';
+}
+
+function loadAll(){
+  var sources = {{ sources_json|safe }};
+  var results = {}, errors = [], pending = sources.length;
+
+  function onDone(){
+    pending--;
+    if(pending > 0) return;
+    if(errors.length){
+      document.getElementById('settingsContainer').innerHTML =
+        '<div class="callout" style="border-color:var(--negative);color:var(--negative);">'
+        +'⚠ 以下來源設定載入失敗，請重新整理頁面：'+errors.join(', ')+'</div>';
+    }
+    renderAll(sources, results);
+  }
+
+  sources.forEach(function(s){
+    $.ajax({
+      url: '/crawler-admin/api/config/'+s+'/',
+      type: 'GET',
+      success: function(d){ results[s] = d; onDone(); },
+      error:   function(){ errors.push(s); results[s] = null; onDone(); }
+    });
+  });
+}
+
+function renderAll(sources, results){
+  var html = sources.map(function(s){
+    var c    = results[s] || {};
+    var meta = SOURCE_META[s] || {};
+    var maxPages  = def(c.max_pages,      50);
+    var delayMin  = def(c.delay_min,      0.8);
+    var delayMax  = def(c.delay_max,      1.5);
+    var ua        = esc(def(c.user_agent, ''));
+    var playwright= c.use_playwright ? 'checked' : '';
+    var notes     = esc(def(c.extra_notes, ''));
+    var labelCls  = meta.label==='官方來源'?'pill-green':meta.label==='社群論壇'?'pill-blue':'pill-gray';
+    var loadErr   = results[s] === null
+      ? '<div class="callout" style="border-color:var(--negative);color:var(--negative);margin-bottom:8px;">⚠ 載入失敗，顯示的為預設值，儲存前請先重新整理</div>' : '';
+
+    return '<div class="card" style="margin-bottom:16px;">'
+      +'<div class="card-header-bar">'
+        +'<h5>'+meta.name+' <span class="pill pill-gray" style="font-size:11px;">'+s+'</span></h5>'
+        +'<span class="pill '+labelCls+'">'+meta.label+'</span>'
+      +'</div>'
+      +'<div class="card-body">'
+        +loadErr
+        +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;">'
+          +'<div><label class="form-label">最大爬取頁數</label>'
+            +'<input type="number" class="form-control" id="'+s+'-max_pages" value="'+maxPages+'" min="0" max="500">'
+            +'<div class="form-text" style="font-size:11px;">0 = 不限制</div>'
+          +'</div>'
+          +'<div><label class="form-label">最小延遲（秒）</label>'
+            +'<input type="number" class="form-control" id="'+s+'-delay_min" value="'+delayMin+'" step="0.1" min="0">'
+          +'</div>'
+          +'<div><label class="form-label">最大延遲（秒）</label>'
+            +'<input type="number" class="form-control" id="'+s+'-delay_max" value="'+delayMax+'" step="0.1" min="0">'
+          +'</div>'
+        +'</div>'
+        +'<div class="mt-3">'
+          +'<label class="form-label">User-Agent</label>'
+          +'<input type="text" class="form-control" id="'+s+'-user_agent" value="'+ua+'">'
+        +'</div>'
+        +'<div class="mt-3 form-check">'
+          +'<input type="checkbox" class="form-check-input" id="'+s+'-playwright" '+playwright+'>'
+          +'<label class="form-check-label" for="'+s+'-playwright">使用 Playwright 渲染（動態頁面）</label>'
+        +'</div>'
+        +'<div class="mt-3">'
+          +'<label class="form-label">備註</label>'
+          +'<textarea class="form-control" id="'+s+'-notes" rows="2">'+notes+'</textarea>'
+        +'</div>'
+        +'<div class="mt-3" style="display:flex;gap:8px;align-items:center;">'
+          +'<button class="btn btn-accent btn-sm" onclick="saveConfig(\''+s+'\')">儲存</button>'
+          +'<button class="btn btn-outline-secondary btn-sm" onclick="resetConfig(\''+s+'\')">還原預設值</button>'
+          +'<span id="'+s+'-msg" style="font-size:12px;line-height:1;"></span>'
+        +'</div>'
+      +'</div>'
+      +'</div>';
+  }).join('');
+  document.getElementById('settingsContainer').innerHTML = html;
+}
+
+function saveConfig(source){
+  var maxPagesRaw = document.getElementById(source+'-max_pages').value;
+  var delayMinRaw = document.getElementById(source+'-delay_min').value;
+  var delayMaxRaw = document.getElementById(source+'-delay_max').value;
+
+  /* 使用 parseFloat/parseInt 後做 isNaN 檢查，不用 || 避免 0 被替換成預設值 */
+  var maxPages = parseInt(maxPagesRaw, 10);
+  var delayMin = parseFloat(delayMinRaw);
+  var delayMax = parseFloat(delayMaxRaw);
+
+  if(isNaN(maxPages) || maxPages < 0){ maxPages = 50; }
+  if(isNaN(delayMin) || delayMin < 0){ delayMin = 0.8; }
+  if(isNaN(delayMax) || delayMax < 0){ delayMax = 1.5; }
+
+  var data = {
+    max_pages:      maxPages,
+    delay_min:      delayMin,
+    delay_max:      delayMax,
+    user_agent:     document.getElementById(source+'-user_agent').value,
+    use_playwright: document.getElementById(source+'-playwright').checked,
+    extra_notes:    document.getElementById(source+'-notes').value,
+  };
+
+  var msg = document.getElementById(source+'-msg');
+  msg.textContent = '儲存中…'; msg.style.color = 'var(--muted)';
+
+  $.ajax({
+    url:  '/crawler-admin/api/config/'+source+'/save/',
+    type: 'POST',
+    contentType: 'application/json',
+    headers: {'X-CSRFToken': getCsrf()},
+    data: JSON.stringify(data),
+    success: function(r){
+      if(r.ok){
+        msg.textContent = '✓ 已儲存'; msg.style.color = 'var(--positive)';
+        configs[source] = (r.config || data); /* 以後端回傳為準，同步快取 */
+      } else {
+        msg.textContent = '✗ ' + (r.error||'未知錯誤'); msg.style.color = 'var(--negative)';
+      }
+      setTimeout(function(){ msg.textContent = ''; }, 3000);
+    },
+    error: function(xhr){
+      msg.textContent = '✗ 儲存失敗（HTTP ' + xhr.status + '），請重試';
+      msg.style.color = 'var(--negative)';
+      setTimeout(function(){ msg.textContent = ''; }, 5000);
+    }
+  });
+}
+
+function resetConfig(source){
+  if(!confirm('確定還原 '+source+' 的設定為預設值？')) return;
+  var defaults = {
+    max_pages:50, delay_min:0.8, delay_max:1.5, use_playwright:false,
+    user_agent:'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    extra_notes:''
+  };
+  $.ajax({
+    url:  '/crawler-admin/api/config/'+source+'/save/',
+    type: 'POST',
+    contentType: 'application/json',
+    headers: {'X-CSRFToken': getCsrf()},
+    data: JSON.stringify(defaults),
+    success: function(){ loadAll(); },
+    error:   function(xhr){ alert('還原失敗（HTTP '+xhr.status+'），請重試'); }
+  });
+}
+
+loadAll();
+</script>
+{% endblock %}

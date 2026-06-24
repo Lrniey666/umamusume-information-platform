@@ -1,0 +1,371 @@
+{% extends "app_crawler_admin/base_admin.html" %}
+{% block title %}資料管理{% endblock %}
+{% block nav_data_manager %}active{% endblock %}
+
+{% block extra_css %}
+<style>
+  .dm-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  .dm-stat-card {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    background: var(--card-bg);
+  }
+  .dm-stat-card .label {
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+  .dm-stat-card .value {
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.2;
+    margin-top: 4px;
+  }
+  .dm-stat-card .sub {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 3px;
+  }
+  .dm-stat-card.accent { border-color: var(--accent); background: var(--accent-muted); }
+  .dm-stat-card.warn   { border-color: #d29922; background: rgba(210,153,34,.08); }
+  .dm-stat-card.danger { border-color: #f85149; background: rgba(248,81,73,.07); }
+
+  .action-section {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+    margin-bottom: 16px;
+    background: var(--card-bg);
+  }
+  .action-section h3 {
+    font-size: 13px;
+    font-weight: 700;
+    margin: 0 0 4px;
+    color: var(--text);
+  }
+  .action-section p {
+    font-size: 12px;
+    color: var(--muted);
+    margin: 0 0 14px;
+  }
+  .action-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+  .badge-source {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    background: var(--accent-muted);
+    color: var(--accent);
+    border: 1px solid var(--accent);
+  }
+  #scanResult {
+    margin-top: 12px;
+    display: none;
+  }
+  .scan-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+  }
+  .scan-row:last-child { border-bottom: none; }
+  .scan-row .scan-label { color: var(--muted); }
+  .scan-row .scan-val { font-weight: 600; }
+  .scan-row .scan-val.ok  { color: #3fb950; }
+  .scan-row .scan-val.warn { color: #d29922; }
+  .scan-row .scan-val.err  { color: #f85149; }
+
+  #opLog {
+    background: #0d1117;
+    color: #c9d1d9;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-family: "SF Mono","Fira Code",monospace;
+    font-size: 11.5px;
+    line-height: 1.8;
+    max-height: 160px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    display: none;
+    margin-top: 12px;
+  }
+  .log-ok  { color: #3fb950; }
+  .log-err { color: #f85149; }
+  .log-dim { color: #8b949e; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">資料管理</h1>
+  <p class="page-subtitle">NewsData 來源統計 · 批次清除 · 狀態重設 · 資料品質掃描</p>
+</div>
+
+<!-- ─── 統計卡片 ─── -->
+<section class="action-section">
+  <h3>NewsData 統計</h3>
+  <p>各來源 / 各處理狀態的資料筆數（點選「重新整理」更新）</p>
+  <div class="action-row" style="margin-bottom:12px;">
+    <button class="btn btn-sm btn-outline-secondary" onclick="loadStats()">⟳ 重新整理</button>
+    <span id="statsLoading" class="text-muted" style="font-size:12px;display:none;">載入中…</span>
+  </div>
+  <div class="dm-grid" id="statsGrid">
+    <div class="dm-stat-card accent">
+      <div class="label">總筆數</div>
+      <div class="value" id="statTotal">—</div>
+    </div>
+  </div>
+  <div class="dm-grid" id="statusGrid"></div>
+</section>
+
+<!-- ─── 按來源清除 ─── -->
+<section class="action-section">
+  <h3>按來源清除</h3>
+  <p>選擇要清除的來源；網路來源可一鍵清除，Discord / YouTube 需個別確認。</p>
+  <div class="action-row">
+    <button class="btn btn-sm btn-outline-danger" onclick="clearSource('web')" title="清除 bilibili/bahamut/ettoday/gamme/udn">
+      清除全部網路來源
+    </button>
+    <button class="btn btn-sm btn-outline-secondary" onclick="clearSource('bilibili')">bilibili</button>
+    <button class="btn btn-sm btn-outline-secondary" onclick="clearSource('bahamut')">bahamut</button>
+    <button class="btn btn-sm btn-outline-secondary" onclick="clearSource('ettoday')">ettoday</button>
+    <button class="btn btn-sm btn-outline-secondary" onclick="clearSource('gamme')">gamme</button>
+    <button class="btn btn-sm btn-outline-secondary" onclick="clearSource('udn')">udn</button>
+    <button class="btn btn-sm btn-outline-secondary" onclick="clearSource('discord')">discord</button>
+    <button class="btn btn-sm btn-outline-secondary" onclick="clearSource('youtube')">youtube</button>
+  </div>
+</section>
+
+<!-- ─── 按日期清除 ─── -->
+<section class="action-section">
+  <h3>按日期清除</h3>
+  <p>清除指定日期之前的所有資料（可選擇限定單一來源）。</p>
+  <div class="action-row">
+    <label style="font-size:12px;color:var(--muted);">清除早於：</label>
+    <input type="date" id="clearDateInput" class="form-control form-control-sm" style="width:150px;">
+    <select id="clearDateSource" class="form-select form-select-sm" style="width:130px;">
+      <option value="">全部來源</option>
+      <option>bilibili</option><option>bahamut</option><option>ettoday</option>
+      <option>gamme</option><option>udn</option><option>discord</option><option>youtube</option>
+    </select>
+    <button class="btn btn-sm btn-outline-danger" onclick="clearByDate()">清除</button>
+  </div>
+</section>
+
+<!-- ─── 刪除單筆 ─── -->
+<section class="action-section">
+  <h3>依 item_id 刪除單筆</h3>
+  <p>精確刪除特定筆數，用於修正異常資料。</p>
+  <div class="action-row">
+    <input type="text" id="deleteItemId" class="form-control form-control-sm"
+           placeholder="item_id（如 bilibili_特別週）" style="max-width:320px;">
+    <button class="btn btn-sm btn-outline-danger" onclick="deleteItem()">刪除</button>
+  </div>
+</section>
+
+<!-- ─── 狀態重設 ─── -->
+<section class="action-section">
+  <h3>狀態重設</h3>
+  <p>將已處理的資料 status 重設，觸發重新執行斷詞 / 情感標記。</p>
+  <div class="action-row">
+    <select id="resetSource" class="form-select form-select-sm" style="width:130px;">
+      <option value="">全部來源</option>
+      <option>bilibili</option><option>bahamut</option><option>ettoday</option>
+      <option>gamme</option><option>udn</option><option>discord</option><option>youtube</option>
+    </select>
+    <select id="resetToStatus" class="form-select form-select-sm" style="width:130px;">
+      <option value="raw">→ raw（重新斷詞）</option>
+      <option value="tokenized">→ tokenized（重新標記情感）</option>
+    </select>
+    <button class="btn btn-sm btn-outline-warning" onclick="resetStatus()">重設狀態</button>
+  </div>
+</section>
+
+<!-- ─── 資料品質掃描 ─── -->
+<section class="action-section">
+  <h3>資料品質掃描</h3>
+  <p>掃描 null date、空標題、空內容、未標記筆數，以及 Bilibili 舊格式 item_id 數量。</p>
+  <div class="action-row">
+    <button class="btn btn-sm btn-outline-secondary" onclick="runScan()">▶ 開始掃描</button>
+  </div>
+  <div id="scanResult">
+    <div class="scan-row"><span class="scan-label">日期為 null</span><span class="scan-val" id="s_null_date">—</span></div>
+    <div class="scan-row"><span class="scan-label">標題為空</span><span class="scan-val" id="s_empty_title">—</span></div>
+    <div class="scan-row"><span class="scan-label">內容為空</span><span class="scan-val" id="s_empty_content">—</span></div>
+    <div class="scan-row"><span class="scan-label">尚未標記（非 labeled）</span><span class="scan-val" id="s_not_labeled">—</span></div>
+    <div class="scan-row">
+      <span class="scan-label">Bilibili 舊格式 item_id（category_idx）</span>
+      <span class="scan-val" id="s_bilibili_old">—</span>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 操作日誌 ─── -->
+<div id="opLog"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const CSRF = '{{ csrf_token }}';
+
+function logOp(msg, type='ok') {
+  const el = document.getElementById('opLog');
+  el.style.display = 'block';
+  const cls = type === 'err' ? 'log-err' : type === 'dim' ? 'log-dim' : 'log-ok';
+  el.innerHTML += `<span class="${cls}">${new Date().toLocaleTimeString()} ${msg}</span>\n`;
+  el.scrollTop = el.scrollHeight;
+}
+
+async function apiFetch(url, method='GET', body=null) {
+  const opts = { method, headers: { 'X-CSRFToken': CSRF } };
+  if (body) {
+    opts.headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify(body);
+  }
+  const res = await fetch(url, opts);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  return data;
+}
+
+async function loadStats() {
+  document.getElementById('statsLoading').style.display = 'inline';
+  try {
+    const d = await apiFetch("{% url 'app_crawler_admin:api_data_manager_stats' %}");
+    document.getElementById('statTotal').textContent = d.total.toLocaleString();
+
+    const grid = document.getElementById('statsGrid');
+    grid.innerHTML = '';
+    const srcColors = { bilibili:'accent', bahamut:'', ettoday:'', gamme:'', udn:'', discord:'', youtube:'' };
+    for (const [src, cnt] of Object.entries(d.by_source || {})) {
+      grid.innerHTML += `<div class="dm-stat-card ${srcColors[src]||''}">
+        <div class="label">${src}</div>
+        <div class="value">${cnt.toLocaleString()}</div>
+        <div class="sub">筆</div>
+      </div>`;
+    }
+
+    const stGrid = document.getElementById('statusGrid');
+    stGrid.innerHTML = '';
+    const stColors = { raw:'', tokenized:'accent', labeled:'accent' };
+    const stLabel  = { raw:'已爬取', tokenized:'已斷詞', labeled:'已情感標記' };
+    for (const [st, cnt] of Object.entries(d.by_status || {})) {
+      stGrid.innerHTML += `<div class="dm-stat-card ${stColors[st]||''}">
+        <div class="label">status: ${st}</div>
+        <div class="value">${cnt.toLocaleString()}</div>
+        <div class="sub">${stLabel[st]||st}</div>
+      </div>`;
+    }
+    logOp(`統計更新完成，總計 ${d.total} 筆`, 'ok');
+  } catch (e) {
+    logOp(`載入統計失敗：${e.message}`, 'err');
+  } finally {
+    document.getElementById('statsLoading').style.display = 'none';
+  }
+}
+
+async function clearSource(source) {
+  const label = source === 'web' ? '全部網路來源（bilibili/bahamut/ettoday/gamme/udn）' : source;
+  if (!confirm(`確定要清除 ${label} 的所有資料？此操作不可復原。`)) return;
+  try {
+    const d = await apiFetch("{% url 'app_crawler_admin:api_data_manager_clear_source' %}", 'POST', { source });
+    logOp(d.message, 'ok');
+    await loadStats();
+  } catch (e) {
+    logOp(`清除失敗：${e.message}`, 'err');
+  }
+}
+
+async function clearByDate() {
+  const beforeDate = document.getElementById('clearDateInput').value;
+  const source     = document.getElementById('clearDateSource').value;
+  if (!beforeDate) { alert('請選擇日期'); return; }
+  const label = source ? `${source} 中` : '所有來源中';
+  if (!confirm(`確定要清除 ${label} ${beforeDate} 之前的資料？此操作不可復原。`)) return;
+  try {
+    const body = { before_date: beforeDate };
+    if (source) body.source = source;
+    const d = await apiFetch("{% url 'app_crawler_admin:api_data_manager_clear_date' %}", 'POST', body);
+    logOp(d.message, 'ok');
+    await loadStats();
+  } catch (e) {
+    logOp(`清除失敗：${e.message}`, 'err');
+  }
+}
+
+async function deleteItem() {
+  const item_id = document.getElementById('deleteItemId').value.trim();
+  if (!item_id) { alert('請輸入 item_id'); return; }
+  if (!confirm(`確定要刪除 "${item_id}"？`)) return;
+  try {
+    const d = await apiFetch("{% url 'app_crawler_admin:api_data_manager_delete_item' %}", 'POST', { item_id });
+    logOp(d.message, 'ok');
+    document.getElementById('deleteItemId').value = '';
+    await loadStats();
+  } catch (e) {
+    logOp(`刪除失敗：${e.message}`, 'err');
+  }
+}
+
+async function resetStatus() {
+  const source    = document.getElementById('resetSource').value;
+  const to_status = document.getElementById('resetToStatus').value;
+  const label = source ? source : '全部來源';
+  if (!confirm(`確定要將 ${label} 的 status 重設為 ${to_status}？`)) return;
+  try {
+    const body = { to_status };
+    if (source) body.source = source;
+    const d = await apiFetch("{% url 'app_crawler_admin:api_data_manager_reset_status' %}", 'POST', body);
+    logOp(d.message, 'ok');
+    await loadStats();
+  } catch (e) {
+    logOp(`重設失敗：${e.message}`, 'err');
+  }
+}
+
+async function runScan() {
+  logOp('開始掃描…', 'dim');
+  try {
+    const d = await apiFetch("{% url 'app_crawler_admin:api_data_manager_scan' %}");
+    document.getElementById('scanResult').style.display = 'block';
+
+    function setVal(id, val, threshold=0) {
+      const el = document.getElementById(id);
+      el.textContent = val.toLocaleString();
+      el.className = 'scan-val ' + (val > threshold ? 'warn' : 'ok');
+    }
+    setVal('s_null_date',      d.null_date);
+    setVal('s_empty_title',    d.empty_title);
+    setVal('s_empty_content',  d.empty_content);
+    setVal('s_not_labeled',    d.not_labeled);
+
+    const oldEl = document.getElementById('s_bilibili_old');
+    oldEl.textContent = `${d.bilibili_old_id} / ${d.bilibili_total}`;
+    oldEl.className = 'scan-val ' + (d.bilibili_old_id > 0 ? 'err' : 'ok');
+
+    logOp('掃描完成', 'ok');
+  } catch (e) {
+    logOp(`掃描失敗：${e.message}`, 'err');
+  }
+}
+
+// 頁面載入時自動拉統計
+document.addEventListener('DOMContentLoaded', loadStats);
+</script>
+{% endblock %}

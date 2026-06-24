@@ -1,0 +1,144 @@
+{% extends "app_crawler_admin/base_admin.html" %}
+{% block title %}資料統計{% endblock %}
+{% block nav_stats %}active{% endblock %}
+
+{% block extra_css %}
+<style>
+  .chart-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;}
+  .chart-title{font-size:13px;font-weight:600;margin-bottom:12px;}
+  canvas{max-height:280px;}
+  .source-table td,.source-table th{font-size:13px;}
+  .bar-visual{
+    height:20px;background:var(--accent);border-radius:3px;
+    display:inline-block;min-width:3px;vertical-align:middle;
+    transition:width .5s ease;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-row">
+    <div>
+      <h1>資料統計</h1>
+      <p class="page-subtitle">各來源文章數量分佈與趨勢</p>
+    </div>
+    <button class="btn btn-outline-secondary btn-sm" onclick="loadStats()">↻ 重新整理</button>
+  </div>
+</div>
+
+<!-- Top stats -->
+<div class="stat-cards" id="topStats">
+  <div class="stat-card c-accent"><div class="val" id="s-grand">—</div><div class="lbl">資料庫總文章數</div></div>
+  <div class="stat-card c-green"><div class="val" id="s-srcs">—</div><div class="lbl">有資料的來源數</div></div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px;">
+  <!-- Pie Chart -->
+  <div class="chart-card">
+    <div class="chart-title">各來源文章佔比</div>
+    <canvas id="pieChart"></canvas>
+  </div>
+  <!-- Bar Chart -->
+  <div class="chart-card">
+    <div class="chart-title">各來源文章數（長條）</div>
+    <canvas id="barChart"></canvas>
+  </div>
+</div>
+
+<!-- Table -->
+<div class="card">
+  <div class="card-header-bar"><h5>來源明細表</h5></div>
+  <div class="tbl-wrap">
+    <table class="source-table">
+      <thead>
+        <tr><th>來源</th><th>名稱</th><th>文章數</th><th>佔比</th><th>視覺化</th></tr>
+      </thead>
+      <tbody id="statsBody">
+        <tr><td colspan="5" style="text-align:center;color:var(--muted)">載入中…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+<script>
+var SOURCE_META = {{ source_meta|safe }};
+var COLORS = ['#7C3AED','#2E9E6B','#2563EB','#D97706','#D9503F'];
+var pieChart=null, barChart=null;
+
+function buildCharts(labels, values){
+  if(pieChart) pieChart.destroy();
+  if(barChart) barChart.destroy();
+
+  var isDark = document.documentElement.getAttribute('data-theme')==='dark';
+  var gridColor = isDark ? '#2e2a27' : '#e4e0d8';
+  var textColor = isDark ? '#9c9690' : '#6b6560';
+
+  pieChart = new Chart(document.getElementById('pieChart'),{
+    type:'doughnut',
+    data:{labels:labels,datasets:[{data:values,backgroundColor:COLORS,borderWidth:2,
+         borderColor:isDark?'#1e1a18':'#fff'}]},
+    options:{plugins:{legend:{position:'bottom',labels:{font:{size:12},color:textColor}}},
+             animation:{duration:600}}
+  });
+
+  barChart = new Chart(document.getElementById('barChart'),{
+    type:'bar',
+    data:{labels:labels,datasets:[{label:'文章數',data:values,backgroundColor:COLORS,
+         borderRadius:5,borderSkipped:false}]},
+    options:{
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{grid:{color:gridColor},ticks:{color:textColor}},
+        y:{grid:{color:gridColor},ticks:{color:textColor,precision:0}}
+      },
+      animation:{duration:600}
+    }
+  });
+}
+
+function loadStats(){
+  $.get('/crawler-admin/api/stats/', function(d){
+    var stats=d.stats||{};
+    var sources=d.sources||[];
+    var labels=[],values=[],total=0;
+    sources.forEach(function(s){
+      var c=stats[s]||0;
+      labels.push((SOURCE_META[s]&&SOURCE_META[s].name)||s);
+      values.push(c);
+      total+=c;
+    });
+
+    document.getElementById('s-grand').textContent=total.toLocaleString();
+    document.getElementById('s-srcs').textContent =values.filter(function(v){return v>0;}).length;
+
+    buildCharts(labels,values);
+
+    var html=sources.map(function(s,i){
+      var c=stats[s]||0;
+      var pct=total>0?((c/total)*100).toFixed(1):0;
+      var bw=total>0?Math.round((c/total)*200):0;
+      return '<tr>'
+        +'<td><code>'+s+'</code></td>'
+        +'<td>'+((SOURCE_META[s]&&SOURCE_META[s].name)||s)+'</td>'
+        +'<td style="font-weight:600">'+c.toLocaleString()+'</td>'
+        +'<td>'+pct+'%</td>'
+        +'<td><span class="bar-visual" style="width:'+bw+'px;background:'+COLORS[i%COLORS.length]+'"></span></td>'
+        +'</tr>';
+    }).join('');
+    document.getElementById('statsBody').innerHTML=html||'<tr><td colspan="5" style="text-align:center;color:var(--muted)">尚無資料</td></tr>';
+  });
+}
+
+loadStats();
+
+// 主題切換後重繪圖表
+document.addEventListener('DOMContentLoaded',function(){
+  var orig=window.toggleTheme;
+  window.toggleTheme=function(){orig();setTimeout(loadStats,200);};
+});
+</script>
+{% endblock %}

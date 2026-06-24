@@ -1,0 +1,615 @@
+{% extends "app_crawler_admin/base_admin.html" %}
+{% block title %}即時監控 · {{ source_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* ── 版面 ── */
+  .monitor-grid{display:grid;grid-template-columns:1fr 300px;gap:16px;}
+  @media(max-width:960px){.monitor-grid{grid-template-columns:1fr;}}
+
+  /* ── 終端機視窗 ── */
+  .terminal-window{
+    border-radius:10px;overflow:hidden;
+    box-shadow:0 6px 28px rgba(0,0,0,.35);border:1px solid #30363d;
+  }
+  .terminal-titlebar{
+    background:#21262d;display:flex;align-items:center;gap:8px;
+    padding:8px 14px;border-bottom:1px solid #30363d;user-select:none;
+  }
+  .terminal-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0;}
+  .dot-close  {background:#ff5f57;}
+  .dot-min    {background:#febc2e;}
+  .dot-max    {background:#28c840;}
+  .terminal-title{
+    flex:1;text-align:center;font-size:11.5px;color:#848d97;
+    font-family:"SF Mono","Fira Code",monospace;
+  }
+  .terminal-badge{
+    background:#388bfd22;color:#58a6ff;border:1px solid #388bfd44;
+    border-radius:4px;font-size:10px;padding:1px 6px;font-family:monospace;
+  }
+  .terminal-body{
+    background:#0d1117;color:#c9d1d9;
+    font-family:"SF Mono","Fira Code","Cascadia Code",monospace;
+    font-size:12px;line-height:1.75;
+    height:480px;overflow-y:auto;padding:12px 14px;
+    scroll-behavior:smooth;
+  }
+  .terminal-body::-webkit-scrollbar{width:6px;}
+  .terminal-body::-webkit-scrollbar-track{background:#161b22;}
+  .terminal-body::-webkit-scrollbar-thumb{background:#30363d;border-radius:3px;}
+  .terminal-body::-webkit-scrollbar-thumb:hover{background:#484f58;}
+
+  /* log 行樣式 */
+  .log-line{display:flex;gap:8px;align-items:baseline;padding:1px 0;
+            animation:linefade .2s ease;}
+  @keyframes linefade{from{opacity:0;transform:translateX(-4px);}to{opacity:1;transform:translateX(0);}}
+  .log-ts{color:#484f58;font-size:10.5px;flex-shrink:0;min-width:64px;}
+  .log-badge{flex-shrink:0;font-size:9.5px;padding:0 4px;border-radius:3px;
+             line-height:1.6;font-weight:600;min-width:34px;text-align:center;}
+  .badge-ok  {background:#1f4a2e;color:#3fb950;}
+  .badge-warn{background:#3d2c0f;color:#d29922;}
+  .badge-err {background:#3d0f0f;color:#f85149;}
+  .badge-info{background:#0f2a3d;color:#58a6ff;}
+  .badge-dim {background:#1c2128;color:#484f58;}
+  .log-text{color:#c9d1d9;word-break:break-all;flex:1;}
+  .log-text.ok  {color:#3fb950;}
+  .log-text.warn{color:#d29922;}
+  .log-text.err {color:#f85149;}
+  .log-text.info{color:#58a6ff;}
+  .log-text.dim {color:#848d97;}
+
+  /* 游標閃爍 */
+  .terminal-cursor{
+    display:inline-block;width:8px;height:14px;background:#58a6ff;
+    vertical-align:middle;margin-left:2px;border-radius:1px;
+    animation:blink 1.1s step-end infinite;
+  }
+  @keyframes blink{0%,100%{opacity:1;}50%{opacity:0;}}
+
+  .terminal-toolbar{
+    background:#161b22;border-top:1px solid #30363d;
+    padding:6px 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  }
+  .term-btn{
+    background:#21262d;border:1px solid #30363d;color:#c9d1d9;
+    border-radius:5px;font-size:11px;padding:3px 10px;cursor:pointer;
+    transition:border-color .15s,background .15s;font-family:monospace;
+  }
+  .term-btn:hover{border-color:#58a6ff;background:#0d2044;}
+  .term-btn.active{border-color:#3fb950;color:#3fb950;background:#1f4a2e;}
+  .term-scroll-hint{color:#484f58;font-size:10px;margin-left:auto;}
+
+  /* ── 右側面板 ── */
+  .right-col{display:flex;flex-direction:column;gap:14px;}
+
+  /* 狀態卡 */
+  .stat-row{display:flex;justify-content:space-between;align-items:center;
+            padding:8px 0;border-bottom:1px solid var(--border);font-size:12.5px;}
+  .stat-row:last-child{border-bottom:none;}
+  .stat-row .sl{color:var(--muted);}
+  .stat-row .sv{font-weight:600;}
+
+  /* 進度條 + 時間 */
+  .progress-section{padding:14px 16px;}
+  .prog-label-row{display:flex;justify-content:space-between;align-items:center;
+                  font-size:11px;margin-bottom:5px;}
+  .prog-label-row .phase{color:var(--muted);}
+  .prog-label-row .pct  {font-weight:700;color:var(--accent);}
+  .prog-thick{height:12px;background:var(--border);border-radius:6px;overflow:hidden;margin-bottom:6px;}
+  .prog-fill {
+    height:100%;border-radius:6px;background:var(--accent);
+    transition:width .5s ease;position:relative;overflow:hidden;
+  }
+  .prog-fill.running::after{
+    content:"";position:absolute;inset:0;
+    background:linear-gradient(90deg,transparent 0%,rgba(255,255,255,.18) 50%,transparent 100%);
+    background-size:200% 100%;animation:shimmer 1.4s linear infinite;
+  }
+  .prog-fill.done{background:var(--positive);}
+  .prog-fill.failed{background:var(--negative);}
+  @keyframes shimmer{0%{background-position:200% 0;}100%{background-position:-200% 0;}}
+
+  .time-row{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:4px;}
+  .time-row .elapsed-val{font-family:monospace;color:var(--text);font-weight:600;}
+
+  /* 統計數字動畫 */
+  .count-badge{
+    font-size:22px;font-weight:700;line-height:1;
+    transition:color .3s;
+  }
+  .count-mini{display:flex;gap:8px;margin-top:8px;}
+  .count-mini-item{
+    flex:1;background:var(--bg);border:1px solid var(--border);
+    border-radius:6px;padding:7px 8px;text-align:center;
+  }
+  .count-mini-item .c-val{font-size:18px;font-weight:700;}
+  .count-mini-item .c-lbl{font-size:9.5px;color:var(--muted);margin-top:1px;}
+  .c-new  {color:var(--positive);}
+  .c-skip {color:var(--muted);}
+  .c-err  {color:var(--negative);}
+
+  /* 歷史記錄彈窗 */
+  .hist-log-pre{
+    background:#0d1117;color:#c9d1d9;border:1px solid #30363d;
+    border-radius:6px;padding:12px;font-family:monospace;font-size:11px;
+    max-height:360px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;
+    line-height:1.7;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-row">
+    <div>
+      <a href="{% url 'app_crawler_admin:dashboard' %}"
+         style="font-size:12px;color:var(--muted);text-decoration:none;">← 返回儀表板</a>
+      <h1 style="margin-top:4px;">{{ source_name }} · 即時監控</h1>
+      <p class="page-subtitle">終端機輸出 · 每 2 秒 polling · source: <code>{{ source }}</code></p>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+      <span class="pill pill-gray" id="statusPill">載入中…</span>
+      <button class="btn btn-accent btn-sm" id="triggerBtn" onclick="triggerCrawler()">▶ 開始爬取</button>
+      <button class="btn btn-danger  btn-sm" id="stopBtn"    onclick="stopCrawler()" disabled>■ 停止</button>
+    </div>
+  </div>
+</div>
+
+<div class="monitor-grid">
+
+  <!-- ── 終端機 ───────────────────────────── -->
+  <div>
+    <div class="terminal-window">
+      <!-- 標題列 -->
+      <div class="terminal-titlebar">
+        <div class="terminal-dot dot-close"></div>
+        <div class="terminal-dot dot-min"></div>
+        <div class="terminal-dot dot-max"></div>
+        <div class="terminal-title" id="termTitle">
+          bash — crawler: {{ source }} — 80×24
+        </div>
+        <span class="terminal-badge" id="lineCountBadge">0 行</span>
+      </div>
+
+      <!-- log 輸出 -->
+      <div class="terminal-body" id="termBody">
+        <div class="log-line">
+          <span class="log-ts">—</span>
+          <span class="log-badge badge-dim">SYS</span>
+          <span class="log-text dim">等待爬蟲啟動…<span class="terminal-cursor" id="cursor"></span></span>
+        </div>
+      </div>
+
+      <!-- 工具列 -->
+      <div class="terminal-toolbar">
+        <button class="term-btn" onclick="clearTerminal()">⌫ 清除</button>
+        <button class="term-btn active" id="autoScrollBtn" onclick="toggleAutoScroll()">↓ 自動捲動</button>
+        <button class="term-btn" onclick="copyLogs()">⎘ 複製全部</button>
+        <span class="term-scroll-hint" id="scrollHint">— 共 0 行輸出 —</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 右側面板 ───────────────────────── -->
+  <div class="right-col">
+
+    <!-- 執行進度卡 -->
+    <div class="card">
+      <div class="card-header-bar">
+        <h5>爬取進度</h5>
+        <span class="pill pill-gray" id="phasePill">待機</span>
+      </div>
+      <div class="progress-section">
+        <div class="prog-label-row">
+          <span class="phase" id="phaseText">尚未啟動</span>
+          <span class="pct"   id="progPct">0%</span>
+        </div>
+        <div class="prog-thick">
+          <div class="prog-fill" id="progFill" style="width:0%"></div>
+        </div>
+        <div class="time-row">
+          <span>已執行</span>
+          <span class="elapsed-val" id="elapsedVal">00:00:00</span>
+        </div>
+        <div class="time-row" style="margin-top:2px;">
+          <span>Run ID</span>
+          <span style="font-family:monospace;font-size:10px;color:var(--text)" id="pi-runid">—</span>
+        </div>
+      </div>
+      <div style="border-top:1px solid var(--border);padding:10px 16px;">
+        <div class="count-mini">
+          <div class="count-mini-item">
+            <div class="c-val c-new"  id="pi-new">0</div>
+            <div class="c-lbl">新增</div>
+          </div>
+          <div class="count-mini-item">
+            <div class="c-val c-skip" id="pi-skip">0</div>
+            <div class="c-lbl">略過</div>
+          </div>
+          <div class="count-mini-item">
+            <div class="c-val c-err"  id="pi-err">0</div>
+            <div class="c-lbl">錯誤</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 最後執行摘要 -->
+    <div class="card">
+      <div class="card-header-bar"><h5>最後執行摘要</h5></div>
+      <div class="card-body" id="lastSummary">
+        <span style="font-size:12px;color:var(--muted)">尚無記錄</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── 近期記錄表 ─────────────────────────────────── -->
+<div class="card" style="margin-top:16px;">
+  <div class="card-header-bar">
+    <h5>{{ source_name }} 近期執行記錄</h5>
+    <button class="btn btn-outline-secondary btn-sm" onclick="loadHistory()">↻ 重新整理</button>
+  </div>
+  <div class="tbl-wrap">
+    <table id="histTable">
+      <thead>
+        <tr>
+          <th>執行時間</th><th>結束時間</th><th>狀態</th>
+          <th>新增</th><th>錯誤</th><th>觸發</th><th>時長</th><th>Log</th>
+        </tr>
+      </thead>
+      <tbody id="histBody">
+        <tr><td colspan="8" style="text-align:center;color:var(--muted)">載入中…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block modals %}
+<!-- ── Log 彈窗 Modal（body 直屬，避免 stacking context 遮蔽問題）── -->
+<div class="modal fade" id="logModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="logModalTitle">執行 Log</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="padding:12px;">
+        <pre class="hist-log-pre" id="logModalBody">載入中…</pre>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary btn-sm" onclick="copyModalLog()">⎘ 複製</button>
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">關閉</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+
+{% block extra_js %}
+<script>
+/* ════════════════════════════════════════════════════════
+   即時監控 JS
+════════════════════════════════════════════════════════ */
+var SOURCE     = '{{ source }}';
+var logOffset  = 0;
+var isRunning  = false;
+var pollTimer  = null;
+var autoScroll = true;
+var startTs    = null;          // 爬蟲啟動時的 Date 物件
+var elapsedTimer = null;
+var totalLines = 0;
+
+/* ── 時間工具 ─────────────────────────── */
+function nowTS(){
+  var d=new Date();
+  return ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)+':'+('0'+d.getSeconds()).slice(-2);
+}
+function fmtDuration(sec){
+  var h=Math.floor(sec/3600), m=Math.floor((sec%3600)/60), s=sec%60;
+  return [h,m,s].map(function(v){return('0'+v).slice(-2);}).join(':');
+}
+function startElapsedClock(){
+  if(elapsedTimer) clearInterval(elapsedTimer);
+  startTs = startTs || new Date();
+  elapsedTimer = setInterval(function(){
+    if(!isRunning){clearInterval(elapsedTimer);return;}
+    var sec = Math.floor((new Date()-startTs)/1000);
+    document.getElementById('elapsedVal').textContent = fmtDuration(sec);
+  },1000);
+}
+
+/* ── 行分類 ──────────────────────────── */
+function classify(line){
+  if(/錯誤|error|exception|failed|traceback/i.test(line)) return 'err';
+  if(/警告|warn/i.test(line))                             return 'warn';
+  if(/新增|已儲存|saved|success|完成|done/i.test(line))   return 'ok';
+  if(/啟動|初始化|start|connecting|載入/i.test(line))     return 'info';
+  return 'dim';
+}
+function badgeClass(cls){
+  return {err:'badge-err',warn:'badge-warn',ok:'badge-ok',info:'badge-info',dim:'badge-dim'}[cls]||'badge-dim';
+}
+function badgeLabel(cls){
+  return {err:'ERR',warn:'WRN',ok:'OK ',info:'INF',dim:'LOG'}[cls]||'LOG';
+}
+
+/* ── 終端機輸出 ──────────────────────── */
+function appendLines(lines){
+  if(!lines.length) return;
+  var body  = document.getElementById('termBody');
+  var frag  = document.createDocumentFragment();
+
+  lines.forEach(function(l){
+    var cls = classify(l);
+    var row = document.createElement('div');
+    row.className = 'log-line';
+
+    var ts   = document.createElement('span');
+    ts.className='log-ts'; ts.textContent=nowTS();
+
+    var badge= document.createElement('span');
+    badge.className='log-badge '+badgeClass(cls);
+    badge.textContent=badgeLabel(cls);
+
+    var txt  = document.createElement('span');
+    txt.className='log-text '+cls;
+    txt.textContent=l;
+
+    row.appendChild(ts); row.appendChild(badge); row.appendChild(txt);
+    frag.appendChild(row);
+  });
+
+  body.appendChild(frag);
+  totalLines += lines.length;
+  document.getElementById('lineCountBadge').textContent = totalLines+' 行';
+  document.getElementById('scrollHint').textContent = '— 共 '+totalLines+' 行輸出 —';
+
+  if(autoScroll) body.scrollTop = body.scrollHeight;
+}
+
+function sysLine(msg, cls){
+  appendLines(['[系統] '+msg]);
+}
+
+function clearTerminal(){
+  logOffset=0; totalLines=0;
+  document.getElementById('termBody').innerHTML=
+    '<div class="log-line"><span class="log-ts">—</span>'
+    +'<span class="log-badge badge-dim">SYS</span>'
+    +'<span class="log-text dim">終端機已清除 <span class="terminal-cursor" id="cursor"></span></span></div>';
+  document.getElementById('lineCountBadge').textContent='0 行';
+  document.getElementById('scrollHint').textContent='— 共 0 行輸出 —';
+}
+
+function toggleAutoScroll(){
+  autoScroll=!autoScroll;
+  var btn=document.getElementById('autoScrollBtn');
+  if(autoScroll){btn.classList.add('active');btn.textContent='↓ 自動捲動';}
+  else          {btn.classList.remove('active');btn.textContent='↑ 手動捲動';}
+}
+
+function copyLogs(){
+  var lines=[];
+  document.querySelectorAll('#termBody .log-text').forEach(function(el){
+    lines.push(el.textContent);
+  });
+  navigator.clipboard.writeText(lines.join('\n'))
+    .then(function(){sysLine('已複製 '+lines.length+' 行到剪貼簿');})
+    .catch(function(){sysLine('複製失敗（請手動選取）');});
+}
+
+/* ── 進度條 ──────────────────────────── */
+var progFakeVal = 0;
+
+function setPhase(phase, pct, cls){
+  var fill = document.getElementById('progFill');
+  var pill = document.getElementById('phasePill');
+  var phaseText = document.getElementById('phaseText');
+
+  phaseText.textContent = phase;
+  document.getElementById('progPct').textContent = Math.round(pct)+'%';
+  fill.style.width = pct+'%';
+
+  fill.className = 'prog-fill'+(cls?' '+cls:'');
+
+  var pillMap={'running':'pill-blue','done':'pill-green','failed':'pill-red','idle':'pill-gray'};
+  pill.className = 'pill '+(pillMap[cls]||'pill-gray');
+  pill.textContent = {running:'執行中',done:'完成',failed:'失敗',idle:'待機'}[cls]||cls;
+}
+
+function tickProgress(){
+  /* 模擬進度：running 狀態下每 poll 微幅推進，但不超過 94% */
+  if(!isRunning) return;
+  progFakeVal = Math.min(progFakeVal + 1.5, 94);
+  document.getElementById('progFill').style.width = progFakeVal+'%';
+  document.getElementById('progPct').textContent  = Math.round(progFakeVal)+'%';
+}
+
+/* ── 狀態更新 ────────────────────────── */
+function updateStatus(data){
+  var running = data.status==='running';
+
+  if(running !== isRunning){
+    /* 狀態切換 */
+    if(running){
+      sysLine('爬蟲已啟動 — PID 記錄中…', 'info');
+      startTs = new Date();
+      startElapsedClock();
+      progFakeVal = 0;
+      setPhase('爬取中…', 0, 'running');
+    } else {
+      var fin = (data.status==='idle');
+      var label = fin ? '執行完成' : '已停止';
+      sysLine(label, fin?'ok':'warn');
+      setPhase(label, 100, fin?'done':'idle');
+      document.getElementById('elapsedVal');  // keep last value
+      if(elapsedTimer) clearInterval(elapsedTimer);
+    }
+  }
+  isRunning = running;
+
+  /* 狀態 pill + 按鈕 */
+  var pill = document.getElementById('statusPill');
+  pill.className = running ? 'pill pill-blue' : 'pill pill-green';
+  pill.textContent= running ? '🟢 執行中' : '⚪ 待機';
+
+  document.getElementById('triggerBtn').disabled = running;
+  document.getElementById('stopBtn').disabled    = !running;
+
+  /* 計數 */
+  var n = data.articles_new  || 0;
+  var s = data.articles_skip || 0;
+  var e = data.articles_err  || 0;
+  animCount('pi-new',  n);
+  animCount('pi-skip', s);
+  animCount('pi-err',  e);
+  document.getElementById('pi-runid').textContent = data.run_id || '—';
+
+  /* 推進假進度 */
+  if(running) tickProgress();
+
+  /* 標題列顯示 run_id 後 12 碼 */
+  var rid = (data.run_id||'').slice(-12);
+  document.getElementById('termTitle').textContent =
+    'bash — crawler:'+SOURCE+(rid ? '  run:'+rid : '');
+}
+
+var _prevCounts={};
+function animCount(id, val){
+  var el=document.getElementById(id);
+  var prev=_prevCounts[id]||0;
+  if(val!==prev){
+    el.textContent=val;
+    el.style.transform='scale(1.3)';
+    setTimeout(function(){el.style.transform='scale(1)';},200);
+    el.style.transition='transform .15s';
+    _prevCounts[id]=val;
+  }
+}
+
+/* ── Polling ─────────────────────────── */
+function pollLog(){
+  $.get('/crawler-admin/api/log/'+SOURCE+'/?offset='+logOffset, function(d){
+    var lines=d.lines||[];
+    if(lines.length){ appendLines(lines); logOffset=d.total; }
+  });
+}
+function pollStatus(){
+  $.get('/crawler-admin/api/status/'+SOURCE+'/', function(d){
+    updateStatus(d);
+  });
+}
+function startPolling(){
+  if(pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(function(){
+    pollStatus();
+    pollLog();
+    if(!isRunning){ clearInterval(pollTimer); loadHistory(); }
+  },2000);
+}
+
+/* ── 爬蟲操作 ────────────────────────── */
+function triggerCrawler(){
+  if(!confirm('確定啟動「'+SOURCE+'」爬蟲？')) return;
+  clearTerminal();
+  logOffset=0; totalLines=0;
+  sysLine('送出啟動請求…', 'info');
+  $.post('/crawler-admin/api/trigger/'+SOURCE+'/', function(r){
+    if(r.ok){
+      sysLine('啟動成功！Run ID: '+r.run_id, 'ok');
+      document.getElementById('pi-runid').textContent=r.run_id;
+      isRunning=true;
+      startTs=new Date();
+      startElapsedClock();
+      progFakeVal=0;
+      setPhase('初始化中…', 2, 'running');
+      startPolling();
+    } else {
+      sysLine('啟動失敗：'+r.error, 'err');
+    }
+  }).fail(function(){
+    sysLine('API 請求失敗，請檢查伺服器', 'err');
+  });
+}
+
+function stopCrawler(){
+  if(!confirm('確定停止「'+SOURCE+'」爬蟲？')) return;
+  sysLine('送出停止信號…', 'warn');
+  $.post('/crawler-admin/api/stop/'+SOURCE+'/', function(r){
+    sysLine(r.ok ? '停止信號已送出，等待行程結束…' : '停止失敗：'+r.error,
+            r.ok ? 'warn' : 'err');
+  }).fail(function(){
+    sysLine('停止 API 請求失敗，請稍後重試', 'err');
+  });
+}
+
+/* ── 歷史記錄 ────────────────────────── */
+function loadHistory(){
+  $.get('/crawler-admin/api/history/?source='+SOURCE+'&limit=15', function(d){
+    var rows=d.runs||[];
+    if(!rows.length){
+      document.getElementById('histBody').innerHTML=
+        '<tr><td colspan="8" style="text-align:center;color:var(--muted)">無記錄</td></tr>';
+      return;
+    }
+
+    /* 最後摘要 */
+    var last=rows[0];
+    var stc={'success':'pill-green','failed':'pill-red','cancelled':'pill-yellow','running':'pill-blue'}[last.status]||'pill-gray';
+    document.getElementById('lastSummary').innerHTML=
+      '<div style="font-size:12px;">'
+      +'<div style="margin-bottom:6px;"><span class="pill '+stc+'" style="margin-right:6px">'+last.status+'</span>'
+      +(last.ended_at ? last.started_at+' → '+last.ended_at : last.started_at)+'</div>'
+      +'<div style="color:var(--muted)">新增 <b style="color:var(--positive)">'+last.articles_new+'</b> 篇 ·'
+      +' 錯誤 <b style="color:var(--negative)">'+last.articles_err+'</b> 篇'
+      +(last.duration_s != null ? ' · <b>'+fmtDuration(last.duration_s)+'</b>' : '')+'</div>'
+      +'</div>';
+
+    var html=rows.map(function(r){
+      var sc={'success':'pill-green','failed':'pill-red','cancelled':'pill-yellow','running':'pill-blue'}[r.status]||'pill-gray';
+      var dur = r.duration_s!=null ? fmtDuration(r.duration_s) : '—';
+      return '<tr>'
+        +'<td style="font-family:monospace;font-size:11px">'+r.started_at+'</td>'
+        +'<td style="font-family:monospace;font-size:11px">'+(r.ended_at||'—')+'</td>'
+        +'<td><span class="pill '+sc+'">'+r.status+'</span></td>'
+        +'<td style="color:var(--positive);font-weight:600">'+r.articles_new+'</td>'
+        +'<td style="color:var(--negative)">'+r.articles_err+'</td>'
+        +'<td>'+r.triggered_by+'</td>'
+        +'<td style="font-family:monospace">'+dur+'</td>'
+        +'<td><button class="btn btn-outline-secondary btn-sm" onclick="showLog(\''+r.run_id+'\')">Log</button></td>'
+        +'</tr>';
+    }).join('');
+    document.getElementById('histBody').innerHTML=html;
+  });
+}
+
+function showLog(runId){
+  document.getElementById('logModalTitle').textContent='執行 Log · '+runId.slice(-12);
+  document.getElementById('logModalBody').textContent='載入中…';
+  var modal=new bootstrap.Modal(document.getElementById('logModal'));
+  modal.show();
+  $.get('/crawler-admin/api/history/'+runId+'/', function(d){
+    document.getElementById('logModalBody').textContent = d.log_text||'（無 log 記錄）';
+  });
+}
+
+function copyModalLog(){
+  var text=document.getElementById('logModalBody').textContent;
+  navigator.clipboard.writeText(text).catch(function(){});
+}
+
+/* ── 初始化 ──────────────────────────── */
+$(function(){
+  pollStatus();
+  pollLog();
+  loadHistory();
+  startPolling();
+});
+</script>
+{% endblock %}

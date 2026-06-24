@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+{% load static %}
+<html lang="zh-TW">
+<head>
+  <title>{% block title %}賽馬娘資訊平台{% endblock %}</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script>
+    (function () {
+      var mode = localStorage.getItem("uma-theme") || "system";
+      var isDark = mode === "dark" || (mode === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+      document.documentElement.setAttribute("data-theme", isDark ? "dark" : "light");
+      document.documentElement.setAttribute("data-theme-mode", mode);
+      // 首次繪製前隱藏區塊，避免「先顯示→淡出→再淡入」閃爍（做到從無到有）
+      if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches && "IntersectionObserver" in window) {
+        document.documentElement.classList.add("reveal-ready");
+      }
+    })();
+  </script>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="{% static 'css/design-system.css' %}" rel="stylesheet" />
+  <link href="{% static 'app_dashboard/css/ai-vrm-assistant.css' %}" rel="stylesheet" />
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+      "@pixiv/three-vrm": "https://unpkg.com/@pixiv/three-vrm@2.1.3/lib/three-vrm.module.min.js"
+    }
+  }
+  </script>
+  {% block extra_css %}{% endblock %}
+</head>
+<body class="ui-modern site-shell">
+  <header class="site-nav">
+    <div class="container">
+      <nav class="navbar navbar-expand-xl">
+        <div class="container-fluid px-0">
+          <a class="navbar-brand fw-bold" href="{% url 'app_character_pk:home' %}">賽馬娘資訊平台</a>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent" aria-controls="navbarContent" aria-expanded="false" aria-label="切換導覽">
+            <span class="navbar-toggler-icon"></span>
+          </button>
+          <div class="collapse navbar-collapse" id="navbarContent">
+            <ul class="navbar-nav me-auto mb-2 mb-xl-0 align-items-xl-center gap-xl-1">
+              <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle" data-bs-toggle="dropdown" type="button" aria-expanded="false">熱門分析</button>
+                <ul class="dropdown-menu">
+                  <li><a class="dropdown-item" href="{% url 'app_character_pk:popularity_list' %}">賽馬娘人氣列表</a></li>
+                  <li><a class="dropdown-item" href="{% url 'app_uma_top_keyword:home' %}">熱門關鍵詞分析</a></li>
+                  <li><a class="dropdown-item" href="{% url 'app_uma_top_character:home' %}">熱門角色排行分析</a></li>
+                </ul>
+              </li>
+              <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle" data-bs-toggle="dropdown" type="button" aria-expanded="false">關鍵詞檢索</button>
+                <ul class="dropdown-menu">
+                  <li><a class="dropdown-item" href="{% url 'app_user_keyword:home' %}">自訂關鍵詞熱門度分析</a></li>
+                  <li><a class="dropdown-item" href="{% url 'app_user_keyword_association:home' %}">全文檢索與關聯分析</a></li>
+                  <li><a class="dropdown-item" href="{% url 'app_user_keyword_sentiment:home' %}">關鍵詞情緒分析</a></li>
+                  <li><a class="dropdown-item" href="{% url 'app_user_keyword_db:home' %}">公告全文檢索</a></li>
+                </ul>
+              </li>
+              <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle" data-bs-toggle="dropdown" type="button" aria-expanded="false">情感儀表板</button>
+                <ul class="dropdown-menu">
+                  <li><a class="dropdown-item" href="{% url 'app_comment_sentiment:dashboard' %}">留言情感儀表板</a></li>
+                  <li><a class="dropdown-item" href="{% url 'app_youtube_uma:dashboard' %}">YouTube 影片情感</a></li>
+                  <li><a class="dropdown-item" href="{% url 'dashboard' %}">公告儀表板</a></li>
+                </ul>
+              </li>
+              <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle" data-bs-toggle="dropdown" type="button" aria-expanded="false">AI 功能</button>
+                <ul class="dropdown-menu">
+                  <li><a class="dropdown-item" href="{% url 'app_user_keyword_llm_report:home' %}">AI 分析報告（Gemini / Claude）</a></li>
+                  <li><hr class="dropdown-divider" /></li>
+                  <li><a class="dropdown-item" href="{% url 'app_rag_uma:chat_view' %}">RAG 知識庫問答</a></li>
+                  <li><a class="dropdown-item" href="{% url 'app_rag_agent:chat_view' %}">Agentic RAG 助理</a></li>
+                  <li><hr class="dropdown-divider" /></li>
+                  <li><a class="dropdown-item" href="{% url 'app_agent_langchain:chat_view' %}">LangChain ReAct Agent</a></li>
+                  <li><a class="dropdown-item" href="{% url 'app_agent_langgraph:chat_view' %}">LangGraph 狀態圖 Agent</a></li>
+                </ul>
+              </li>
+            </ul>
+            <div class="nav-actions">
+              <a href="{% url 'app_uma_info_portal:home' %}" class="btn btn-sm" style="border:1px solid var(--color-border);border-radius:var(--radius-pill);padding:5px 14px;font-size:.82rem;color:var(--color-text-secondary);text-decoration:none;display:inline-flex;align-items:center;gap:6px;" title="UMA Info Discord Bot 官網">
+                UMA Info
+              </a>
+              <form class="nav-search" role="search" action="{% url 'announcement_list' %}" method="get">
+                <input type="search" name="q" placeholder="搜尋公告…" aria-label="搜尋公告" />
+                <button type="submit" aria-label="搜尋" title="搜尋">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                </button>
+              </form>
+              <button id="themeToggleBtn" type="button" aria-label="主題切換">◐</button>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </div>
+  </header>
+
+  <div class="container py-2">
+    <div class="row g-3" id="pageContent">
+      {% block content %}{% endblock %}
+    </div>
+  </div>
+
+  <div
+    id="ai-vrm-assistant-root"
+    class="ai-vrm-assistant-root"
+    aria-live="polite"
+    data-vrm-url="{% static 'app_dashboard/vrm/1077_Narita_Top_Road.vrm' %}"
+    data-chat-url="{% url 'app_agent_uma:chat_view' %}"
+  >
+    <div class="ai-vrm-assistant-body">
+      <div class="ai-vrm-assistant-speech" role="status"></div>
+      <div class="ai-vrm-assistant-canvas-wrap">
+        <div class="ai-vrm-assistant-presets" aria-label="快速提問">
+          <button type="button" data-q="請分析最新輿情">請分析最新輿情</button>
+          <button type="button" data-q="有什麼熱門話題？">有什麼熱門話題？</button>
+          <button type="button" data-q="能帶我瀏覽本平台嗎?">能帶我瀏覽本平台嗎?</button>
+          <button type="button" data-q="目前的聲量趨勢">目前的聲量趨勢</button>
+          <button type="button" data-q="解釋目前的圖表">解釋目前的圖表</button>
+        </div>
+      </div>
+      <div class="ai-vrm-assistant-chat">
+        <input type="text" maxlength="300" placeholder="問我賽馬娘情報..." aria-label="馬娘客服輸入框" />
+        <button type="button" aria-label="送出問題">發送</button>
+      </div>
+    </div>
+    <div class="ai-vrm-assistant-toggle">
+      <button type="button" class="ai-vrm-assistant-toggle-btn" aria-label="切換客服面板">
+        <span class="vrm-toggle-hide" aria-hidden="true">↓</span>
+        <span class="vrm-toggle-hide">收起</span>
+        <span class="vrm-toggle-show" aria-hidden="true">💬</span>
+        <span class="vrm-toggle-show">成田路</span>
+      </button>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="row g-3 align-items-start">
+        <div class="col-lg-3 col-md-4">
+          <a class="footer-brand" href="{% url 'app_character_pk:home' %}">賽馬娘資訊平台</a>
+          <p class="footer-tagline">
+            賽馬娘公告聲量與情緒分析<br />
+            Uma Musume Analytics Dashboard
+          </p>
+        </div>
+        <div class="col-lg-5 col-md-8">
+          <div class="footer-section-title text-uppercase text-muted small fw-bold mb-2">資料來源</div>
+          <ul class="footer-source-list">
+            <li><span class="footer-source-badge">公告</span><a href="https://wiki.biligame.com/umamusume/%E5%85%AC%E5%91%8A" target="_blank" rel="noopener">Bilibili BWIKI 官方公告</a></li>
+            <li><span class="footer-source-badge">論壇</span><a href="https://forum.gamer.com.tw/B.php?bsn=34421" target="_blank" rel="noopener">巴哈姆特賽馬娘哈啦板</a></li>
+            <li><span class="footer-source-badge">新聞</span><a href="https://game.udn.com/game/search/%E9%A6%AC%E5%A8%98" target="_blank" rel="noopener">聯合新聞網遊戲角落</a></li>
+            <li><span class="footer-source-badge">新聞</span><a href="https://game.ettoday.net/search.php?keyword=%E9%A6%AC%E5%A8%98" target="_blank" rel="noopener">ETtoday 新聞雲</a></li>
+            <li><span class="footer-source-badge">新聞</span><a href="https://news.gamme.com.tw/search.php?s=%E9%A6%AC%E5%A8%98" target="_blank" rel="noopener">宅宅新聞</a></li>
+            <li><span class="footer-source-badge">評論</span>Bilibili Reply API（角色頁評論）</li>
+            <li><span class="footer-source-badge">情緒</span><a href="https://ai.google.dev/" target="_blank" rel="noopener">Google Gemini API</a>（公告標記）</li>
+            <li><span class="footer-source-badge">情緒</span><a href="https://github.com/isnowfy/snownlp" target="_blank" rel="noopener">SnowNLP</a>（評論標記）</li>
+          </ul>
+        </div>
+        <div class="col-lg-4 col-md-12">
+          <div class="footer-section-title text-uppercase text-muted small fw-bold mb-2">站台導覽</div>
+          <ul class="footer-source-list mb-3">
+            <li><a href="{% url 'app_poa_introduction:introduction' %}">平台介紹</a></li>
+            <li><a href="{% url 'app_course_intro:index' %}">平台技術說明</a></li>
+            <li><a href="{% url 'app_crawler_admin:dashboard' %}">情報站控制台</a></li>
+          </ul>
+          <div class="footer-section-title text-uppercase text-muted small fw-bold mb-2">資料期間與更新</div>
+          <ul class="footer-source-list">
+            <li><span class="footer-source-badge">公告</span>收集期間：2023–{% now "Y" %}</li>
+            <li><span class="footer-source-badge">評論</span>收集期間：2024–{% now "Y" %}</li>
+            <li><span class="footer-source-badge">更新</span>情緒標記日期：{% now "Y-m-d" %}</li>
+          </ul>
+        </div>
+      </div>
+      <hr class="footer-divider" />
+      <div class="d-flex flex-wrap justify-content-between gap-2">
+        <div class="footer-bottom-left">&copy; {% now "Y" %} 賽馬娘資訊平台 · 資料僅供學術研究與課程作業使用，版權歸原作者所有</div>
+        <div class="footer-bottom-right">Built with Django · Chart.js · Bootstrap 5</div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="{% static 'js/theme.js' %}"></script>
+  <script src="{% static 'js/ui-fx.js' %}"></script>
+  <script type="module" src="{% static 'app_dashboard/js/ai-vrm-assistant.js' %}"></script>
+  {% block extra_js %}{% endblock %}
+</body>
+</html>

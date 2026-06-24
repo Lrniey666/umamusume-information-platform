@@ -1,0 +1,194 @@
+{% extends 'base.html' %}
+{% block title %}{{ announcement.title|truncatechars:30 }} — 賽馬娘留言情緒分析{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+  <a href="{% url 'announcement_list' %}" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left"></i> 返回列表
+  </a>
+</div>
+
+<!-- 公告標題區 -->
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <div class="d-flex align-items-center gap-2 mb-2">
+      <span class="badge cat-badge-{{ announcement.category }} fs-6">{{ announcement.category }}</span>
+      <small class="text-muted"><i class="bi bi-calendar3"></i> {{ announcement.published_date|default:"—" }}</small>
+      <small class="text-muted"><i class="bi bi-chat"></i> {{ comments_count }} 則留言</small>
+    </div>
+    <h1 class="h3 fw-bold">{{ announcement.title }}</h1>
+    {% if announcement.source_url %}
+    <a href="{{ announcement.source_url }}" target="_blank" class="text-purple small">
+      <i class="bi bi-box-arrow-up-right"></i> 查看原始公告
+    </a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- 左欄：情緒分析 -->
+  <div class="col-md-5">
+    {% if sentiment %}
+    <div class="card shadow-sm mb-3" id="sentiment-section">
+      <div class="card-header fw-semibold"><i class="bi bi-emoji-smile text-purple"></i> 留言情緒分析</div>
+      <div class="card-body">
+        <canvas id="emotionPieChart" style="max-height:220px"></canvas>
+
+        <hr/>
+        <p class="fw-semibold mb-2">公告基調</p>
+        <div class="mb-1">
+          <div class="d-flex justify-content-between"><span class="text-success">😊 正面</span><span>{% widthratio sentiment.positive_score 1 100 %}%</span></div>
+          <div class="progress mb-1" style="height:8px">
+            <div class="progress-bar bg-success" style="width:{% widthratio sentiment.positive_score 1 100 %}%"></div>
+          </div>
+        </div>
+        <div class="mb-1">
+          <div class="d-flex justify-content-between"><span class="text-danger">😡 負面</span><span>{% widthratio sentiment.negative_score 1 100 %}%</span></div>
+          <div class="progress mb-1" style="height:8px">
+            <div class="progress-bar bg-danger" style="width:{% widthratio sentiment.negative_score 1 100 %}%"></div>
+          </div>
+        </div>
+        <div class="mb-2">
+          <div class="d-flex justify-content-between"><span class="text-secondary">😐 中立</span><span>{% widthratio sentiment.neutral_score 1 100 %}%</span></div>
+          <div class="progress" style="height:8px">
+            <div class="progress-bar bg-secondary" style="width:{% widthratio sentiment.neutral_score 1 100 %}%"></div>
+          </div>
+        </div>
+        <small class="text-muted">
+          <i class="bi bi-robot"></i> {{ sentiment.ai_model }} &nbsp;·&nbsp;
+          {{ sentiment.analyzed_at|date:"Y-m-d H:i" }}
+        </small>
+      </div>
+    </div>
+    {% else %}
+    <div class="card shadow-sm mb-3" id="pending-section">
+      <div class="card-body text-center py-4">
+        <i class="bi bi-hourglass-split text-muted" style="font-size:2.5rem"></i>
+        <p class="mt-2 mb-3 text-muted">此公告尚未進行情緒分析</p>
+        <button id="btn-analyze" class="btn btn-purple" data-pk="{{ announcement.pk }}">
+          <i class="bi bi-robot"></i> 立即分析
+        </button>
+      </div>
+    </div>
+    <div class="card shadow-sm mb-3 d-none" id="sentiment-section">
+      <div class="card-header fw-semibold"><i class="bi bi-emoji-smile text-purple"></i> 留言情緒分析</div>
+      <div class="card-body">
+        <canvas id="emotionPieChart" style="max-height:220px"></canvas>
+        <hr/>
+        <p class="fw-semibold mb-2">公告基調</p>
+        <div id="sentiment-bars"></div>
+        <small class="text-muted" id="sentiment-meta"></small>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- 公告內文 -->
+    <div class="card shadow-sm">
+      <div class="card-header fw-semibold"><i class="bi bi-file-text text-purple"></i> 公告內文</div>
+      <div class="card-body" style="max-height:400px;overflow-y:auto;font-size:14px;white-space:pre-wrap;">{{ announcement.content }}</div>
+    </div>
+  </div>
+
+  <!-- 右欄：留言清單 -->
+  <div class="col-md-7">
+    <div class="card shadow-sm">
+      <div class="card-header fw-semibold">
+        <i class="bi bi-chat-dots text-purple"></i> 玩家留言（前 30 則，依讚數排序）
+      </div>
+      <div class="card-body p-0" style="max-height:650px;overflow-y:auto;">
+        {% if comments %}
+        {% for c in comments %}
+        <div class="comment-item border-bottom px-3 py-2">
+          <div class="d-flex justify-content-between align-items-start">
+            <div class="d-flex gap-2 align-items-center mb-1">
+              <span class="badge bg-light text-dark border">#{{ c.floor }}</span>
+              <strong class="text-purple" style="font-size:13px">{{ c.author|default:"匿名" }}</strong>
+            </div>
+            <small class="text-muted"><i class="bi bi-hand-thumbs-up"></i> {{ c.upvotes }}</small>
+          </div>
+          <p class="mb-0" style="font-size:14px">{{ c.content }}</p>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="text-center py-4 text-muted">目前沒有留言資料</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const EMOTION_LABELS = {excited:'興奮',happy:'開心',mixed:'五味雜陳',disappointed:'失望',angry:'生氣',sad:'悲傷'};
+const EMOTION_COLORS = ['#f59e0b','#22c55e','#8b5cf6','#64748b','#ef4444','#3b82f6'];
+
+{% if sentiment %}
+// 已分析：直接渲染圓餅圖
+const emotionData = [
+  {{ sentiment.excited }}, {{ sentiment.happy }}, {{ sentiment.mixed }},
+  {{ sentiment.disappointed }}, {{ sentiment.angry }}, {{ sentiment.sad }}
+];
+renderEmotionChart(emotionData);
+{% endif %}
+
+function renderEmotionChart(data) {
+  const ctx = document.getElementById('emotionPieChart');
+  if (!ctx) return;
+  new Chart(ctx, {
+    type: 'pie',
+    data: {
+      labels: Object.values(EMOTION_LABELS),
+      datasets: [{ data, backgroundColor: EMOTION_COLORS }]
+    },
+    options: { plugins: { legend: { position: 'bottom', labels: { font: { size: 12 } } } } }
+  });
+}
+
+function renderSentimentBars(s) {
+  const html = `
+    <div class="mb-1">
+      <div class="d-flex justify-content-between"><span class="text-success">😊 正面</span><span>${(s.positive_score*100).toFixed(0)}%</span></div>
+      <div class="progress mb-1" style="height:8px"><div class="progress-bar bg-success" style="width:${s.positive_score*100}%"></div></div>
+    </div>
+    <div class="mb-1">
+      <div class="d-flex justify-content-between"><span class="text-danger">😡 負面</span><span>${(s.negative_score*100).toFixed(0)}%</span></div>
+      <div class="progress mb-1" style="height:8px"><div class="progress-bar bg-danger" style="width:${s.negative_score*100}%"></div></div>
+    </div>
+    <div class="mb-2">
+      <div class="d-flex justify-content-between"><span class="text-secondary">😐 中立</span><span>${(s.neutral_score*100).toFixed(0)}%</span></div>
+      <div class="progress" style="height:8px"><div class="progress-bar bg-secondary" style="width:${s.neutral_score*100}%"></div></div>
+    </div>`;
+  $('#sentiment-bars').html(html);
+  $('#sentiment-meta').html(`<i class="bi bi-robot"></i> ${s.ai_model} &nbsp;·&nbsp; ${s.analyzed_at.replace('T',' ').substring(0,16)}`);
+}
+
+// 立即分析按鈕
+$('#btn-analyze').on('click', function(){
+  const pk = $(this).data('pk');
+  $(this).prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span>分析中...');
+  $.ajax({
+    url: `/api/analyze/${pk}/`,
+    method: 'POST',
+    headers: { 'X-CSRFToken': getCookie('csrftoken') },
+    success: function(data) {
+      if (data.status === 'success') {
+        const s = data.sentiment;
+        const emotionData = [s.excited, s.happy, s.mixed, s.disappointed, s.angry, s.sad];
+        renderEmotionChart(emotionData);
+        renderSentimentBars(s);
+        $('#sentiment-section').removeClass('d-none');
+        $('#pending-section').addClass('d-none');
+      } else {
+        alert('分析失敗：' + data.message);
+        $('#btn-analyze').prop('disabled', false).html('<i class="bi bi-robot"></i> 立即分析');
+      }
+    },
+    error: function() {
+      alert('API 呼叫失敗，請稍後再試。');
+      $('#btn-analyze').prop('disabled', false).html('<i class="bi bi-robot"></i> 立即分析');
+    }
+  });
+});
+</script>
+{% endblock %}

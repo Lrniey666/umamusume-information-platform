@@ -1,0 +1,601 @@
+{% extends 'app_uma_info_portal/base_portal.html' %}
+{% load static %}
+
+{% block title %}UMA Info — 賽馬娘 Discord 情報 Bot{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* ── Hero ─────────────────────────────────────────────── */
+  .hero {
+    min-height: 100svh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 80px 24px 60px;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 80% 60% at 50% 0%, rgba(88,101,242,.18), transparent),
+      radial-gradient(ellipse 50% 50% at 80% 80%, rgba(167,139,250,.16), transparent);
+    pointer-events: none;
+  }
+  .hero-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 16px;
+    border-radius: 999px;
+    background: rgba(88,101,242,.12);
+    border: 1px solid rgba(88,101,242,.3);
+    color: #5865F2;
+    font-size: .85rem;
+    font-weight: 600;
+    margin-bottom: 28px;
+    animation: fadeInDown .6s ease both;
+  }
+  [data-theme="dark"] .hero-eyebrow { color: #8b9bff; background: rgba(88,101,242,.2); }
+  .hero-title {
+    font-size: clamp(2.4rem, 6vw, 4.2rem);
+    font-weight: 900;
+    line-height: 1.12;
+    letter-spacing: -.03em;
+    color: var(--color-text-primary);
+    margin-bottom: 20px;
+    animation: fadeInUp .65s .1s ease both;
+  }
+  .hero-title .accent-text {
+    background: linear-gradient(135deg, #5865F2 0%, var(--color-accent) 60%, var(--color-gold) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .hero-sub {
+    font-size: clamp(1rem, 2vw, 1.25rem);
+    color: var(--color-text-secondary);
+    max-width: 520px;
+    margin: 0 auto 40px;
+    line-height: 1.65;
+    animation: fadeInUp .65s .2s ease both;
+  }
+  .hero-actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+    animation: fadeInUp .65s .3s ease both;
+  }
+  .btn-hero-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 28px;
+    background: #5865F2;
+    color: #fff;
+    border-radius: var(--radius-pill);
+    font-weight: 700;
+    font-size: 1rem;
+    text-decoration: none;
+    transition: transform .15s, box-shadow .2s;
+    box-shadow: 0 4px 20px rgba(88,101,242,.45);
+  }
+  .btn-hero-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(88,101,242,.55); color:#fff; }
+  .btn-hero-outline {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 28px;
+    background: var(--color-bg-elevated);
+    color: var(--color-text-primary);
+    border-radius: var(--radius-pill);
+    font-weight: 600;
+    font-size: 1rem;
+    text-decoration: none;
+    border: 1px solid var(--color-border);
+    transition: transform .15s, border-color .2s;
+  }
+  .btn-hero-outline:hover { transform: translateY(-2px); border-color: var(--color-accent); color: var(--color-accent); }
+  .hero-scroll {
+    position: absolute;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%);
+    animation: bounce 2s infinite;
+    color: var(--color-text-disabled);
+    font-size: .85rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  /* 浮動裝飾圓點 */
+  .hero-orb {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+    filter: blur(80px);
+    opacity: .35;
+  }
+  .hero-orb-1 {
+    width: 500px; height: 500px;
+    background: #5865F2;
+    top: -160px; right: -120px;
+  }
+  .hero-orb-2 {
+    width: 400px; height: 400px;
+    background: var(--color-accent);
+    bottom: -100px; left: -80px;
+  }
+  [data-theme="dark"] .hero-orb { opacity: .25; }
+
+  /* ── 統計列 ────────────────────────────────────────────── */
+  .stats-bar {
+    display: flex;
+    justify-content: center;
+    gap: 48px;
+    flex-wrap: wrap;
+    padding: 40px 24px;
+    border-top: 1px solid var(--color-border);
+    border-bottom: 1px solid var(--color-border);
+    background: var(--color-bg-surface);
+  }
+  .stat-item { text-align: center; }
+  .stat-value {
+    font-size: 2rem;
+    font-weight: 900;
+    color: var(--color-text-primary);
+    letter-spacing: -.04em;
+    line-height: 1;
+  }
+  .stat-label {
+    font-size: .82rem;
+    color: var(--color-text-secondary);
+    margin-top: 4px;
+  }
+
+  /* ── 功能區 ─────────────────────────────────────────────── */
+  .features { padding: 96px 24px; }
+  .features-header {
+    text-align: center;
+    margin-bottom: 64px;
+  }
+  .features-header h2 {
+    font-size: clamp(1.8rem, 4vw, 2.8rem);
+    font-weight: 900;
+    letter-spacing: -.03em;
+    margin-bottom: 12px;
+  }
+  .features-header p {
+    color: var(--color-text-secondary);
+    font-size: 1.05rem;
+    max-width: 480px;
+    margin: 0 auto;
+  }
+  .feature-row {
+    display: flex;
+    align-items: center;
+    gap: 64px;
+    max-width: 1000px;
+    margin: 0 auto 80px;
+  }
+  .feature-row.reverse { flex-direction: row-reverse; }
+  .feature-text { flex: 1; min-width: 0; }
+  .feature-visual { flex: 1; min-width: 0; }
+  .feature-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: var(--radius-pill);
+    background: var(--color-accent-soft);
+    color: var(--color-accent);
+    font-size: .8rem;
+    font-weight: 700;
+    margin-bottom: 14px;
+  }
+  .feature-text h3 {
+    font-size: 1.75rem;
+    font-weight: 800;
+    letter-spacing: -.02em;
+    margin-bottom: 14px;
+  }
+  .feature-text p {
+    color: var(--color-text-secondary);
+    line-height: 1.7;
+    font-size: .97rem;
+  }
+  .feature-list {
+    list-style: none;
+    padding: 0;
+    margin: 16px 0 0;
+  }
+  .feature-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 6px 0;
+    color: var(--color-text-secondary);
+    font-size: .9rem;
+  }
+  .feature-list li::before { content: '✓'; color: var(--color-positive); font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+
+  /* ── Discord 訊息模擬框 ──────────────────────────────────── */
+  .discord-mockup {
+    background: #313338;
+    border-radius: 16px;
+    padding: 20px;
+    font-family: 'gg sans', 'Noto Sans', sans-serif;
+    box-shadow: 0 16px 48px rgba(0,0,0,.4);
+    max-width: 380px;
+    margin: 0 auto;
+  }
+  .dm-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(255,255,255,.08);
+  }
+  .dm-bot-avatar {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #5865F2, var(--color-accent));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: .85rem;
+    font-weight: 800;
+    color: #fff;
+    flex-shrink: 0;
+    letter-spacing: -.02em;
+  }
+  .cta-icon {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 16px;
+    border-radius: 18px;
+    background: linear-gradient(135deg, #5865F2, var(--color-accent));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.75rem;
+    font-weight: 800;
+    color: #fff;
+    letter-spacing: -.03em;
+    box-shadow: 0 8px 28px rgba(88,101,242,.35);
+  }
+  .dm-bot-name { font-size: .875rem; font-weight: 700; color: #f2f3f5; }
+  .dm-bot-tag { font-size: .72rem; background: #5865F2; color:#fff; padding:1px 6px; border-radius:3px; font-weight:700; }
+  .dm-embed {
+    background: #1e1f22;
+    border-left: 4px solid #5865F2;
+    border-radius: 4px;
+    padding: 14px;
+  }
+  .dm-embed-title { font-size: .9rem; font-weight: 700; color: #5865F2; margin-bottom: 6px; }
+  .dm-embed-desc { font-size: .82rem; color: #b5bac1; line-height: 1.55; }
+  .dm-embed-foot { font-size: .72rem; color: #72767d; margin-top: 10px; }
+  .dm-chat-bubble {
+    background: #383a40;
+    border-radius: 4px 16px 16px 16px;
+    padding: 10px 14px;
+    margin-bottom: 8px;
+  }
+  .dm-chat-user { font-size: .8rem; font-weight: 700; color: #e8c765; margin-bottom: 4px; }
+  .dm-chat-text { font-size: .85rem; color: #dcddde; line-height: 1.5; }
+  .dm-chat-bot-bubble {
+    background: #2c2f33;
+    border-radius: 16px 4px 16px 16px;
+    padding: 10px 14px;
+    margin-left: 16px;
+  }
+  .dm-chat-bot-text { font-size: .85rem; color: #b5bac1; line-height: 1.55; }
+
+  /* 設定面板模擬 */
+  .settings-mockup {
+    background: var(--color-bg-elevated);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    max-width: 360px;
+    margin: 0 auto;
+    box-shadow: 0 8px 32px var(--color-shadow-md);
+  }
+  .sm-title { font-size: .78rem; font-weight: 700; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 12px; }
+  .sm-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--color-border);
+    font-size: .88rem;
+    color: var(--color-text-primary);
+  }
+  .sm-row:last-child { border-bottom: none; }
+  .sm-check { width: 18px; height: 18px; border-radius: 50%; background: var(--color-positive); display:flex; align-items:center; justify-content:center; color:#fff; font-size:.7rem; flex-shrink:0; }
+  .sm-tag { padding:2px 8px; border-radius: var(--radius-pill); background: var(--color-accent-soft); color: var(--color-accent); font-size:.75rem; font-weight:600; }
+  .sm-x { width:18px;height:18px;border-radius:50%;background:var(--color-border);display:flex;align-items:center;justify-content:center;color:var(--color-text-disabled);font-size:.65rem;flex-shrink:0; }
+
+  /* ── CTA Section ────────────────────────────────────────── */
+  .cta-section {
+    padding: 96px 24px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .cta-section::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 70% 60% at 50% 50%, rgba(88,101,242,.12), transparent);
+    pointer-events: none;
+  }
+  .cta-card {
+    max-width: 600px;
+    margin: 0 auto;
+    background: var(--color-bg-elevated);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: 56px 40px;
+    position: relative;
+    z-index: 1;
+    box-shadow: 0 0 0 1px rgba(88,101,242,.15), 0 24px 64px var(--color-shadow-lg);
+  }
+  .cta-card h2 { font-size: 2rem; font-weight: 900; letter-spacing: -.03em; margin-bottom: 14px; }
+  .cta-card p { color: var(--color-text-secondary); margin-bottom: 32px; }
+
+  /* ── 動畫 ─────────────────────────────────────────────── */
+  @keyframes fadeInDown {
+    from { opacity: 0; transform: translateY(-14px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(18px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes bounce {
+    0%,100% { transform: translateX(-50%) translateY(0); }
+    50%      { transform: translateX(-50%) translateY(6px); }
+  }
+
+  /* 響應式 */
+  @media (max-width: 768px) {
+    .feature-row, .feature-row.reverse { flex-direction: column; gap: 32px; }
+    .stats-bar { gap: 32px; }
+    .feature-visual { width: 100%; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ── Hero ────────────────────────────────────────────────────────────────── -->
+<section class="hero">
+  <div class="hero-orb hero-orb-1" aria-hidden="true"></div>
+  <div class="hero-orb hero-orb-2" aria-hidden="true"></div>
+
+  <span class="hero-eyebrow">
+    <svg width="14" height="11" viewBox="0 0 71 55" fill="currentColor" aria-hidden="true"><path d="M60.1045 4.8978C55.5792 2.8214 50.7265 1.2916 45.6527 0.41542C45.5603 0.39851 45.468 0.440769 45.4204 0.525289C44.7963 1.6353 44.105 3.0834 43.6209 4.2216C38.1637 3.4046 32.7345 3.4046 27.3892 4.2216C26.905 3.0581 26.1886 1.6353 25.5617 0.525289C25.5141 0.443589 25.4218 0.40133 25.3294 0.41542C20.2584 1.2888 15.4057 2.8186 10.8776 4.8978C10.8384 4.9147 10.8048 4.9429 10.7825 4.9795C1.57795 18.7309 -0.943561 32.1443 0.293408 45.3914C0.299005 45.4562 0.335386 45.5182 0.385761 45.5576C6.45866 50.0174 12.3413 52.7249 18.1147 54.5195C18.2071 54.5477 18.305 54.5139 18.3638 54.4378C19.7295 52.5728 20.9469 50.6063 21.9907 48.5383C22.0523 48.4172 21.9935 48.2735 21.8676 48.2256C19.9366 47.4931 18.0979 46.6 16.3292 45.5858C16.1893 45.5041 16.1781 45.304 16.3068 45.2082C16.679 44.9293 17.0513 44.6391 17.4067 44.3461C17.471 44.2926 17.5606 44.2813 17.6362 44.3151C29.2558 49.6202 41.8354 49.6202 53.3179 44.3151C53.3935 44.2785 53.4831 44.2898 53.5502 44.3433C53.9057 44.6363 54.2779 44.9293 54.6529 45.2082C54.7816 45.304 54.7732 45.5041 54.6333 45.5858C52.8646 46.6197 51.0259 47.4931 49.0921 48.2228C48.9662 48.2707 48.9102 48.4172 48.9718 48.5383C50.038 50.6034 51.2554 52.5699 52.5959 54.435C52.6519 54.5139 52.7526 54.5477 52.845 54.5195C58.6464 52.7249 64.529 50.0174 70.6019 45.5576C70.6551 45.5182 70.6887 45.459 70.6943 45.3942C72.1747 30.0791 68.2147 16.7757 60.1968 4.9823C60.1772 4.9429 60.1437 4.9147 60.1045 4.8978Z"/></svg>
+    賽馬娘 Discord 情報 Bot
+  </span>
+
+  <h1 class="hero-title">
+    掌握最新賽馬娘情報<br>
+    <span class="accent-text">即時到你的 Discord</span>
+  </h1>
+
+  <p class="hero-sub">
+    每日自動推播日版公告與活動摘要，AI 即時回答你的問題，彈性設定頻道讀取範圍——全程免費，零負擔啟動。
+  </p>
+
+  <div class="hero-actions">
+    {% if client_id_set %}
+      <a class="btn-hero-primary" href="{{ invite_url }}" target="_blank" rel="noopener">
+        <svg width="16" height="13" viewBox="0 0 71 55" fill="currentColor" aria-hidden="true"><path d="M60.1045 4.8978C55.5792 2.8214 50.7265 1.2916 45.6527 0.41542C45.5603 0.39851 45.468 0.440769 45.4204 0.525289C44.7963 1.6353 44.105 3.0834 43.6209 4.2216C38.1637 3.4046 32.7345 3.4046 27.3892 4.2216C26.905 3.0581 26.1886 1.6353 25.5617 0.525289C25.5141 0.443589 25.4218 0.40133 25.3294 0.41542C20.2584 1.2888 15.4057 2.8186 10.8776 4.8978C10.8384 4.9147 10.8048 4.9429 10.7825 4.9795C1.57795 18.7309 -0.943561 32.1443 0.293408 45.3914C0.299005 45.4562 0.335386 45.5182 0.385761 45.5576C6.45866 50.0174 12.3413 52.7249 18.1147 54.5195C18.2071 54.5477 18.305 54.5139 18.3638 54.4378C19.7295 52.5728 20.9469 50.6063 21.9907 48.5383C22.0523 48.4172 21.9935 48.2735 21.8676 48.2256C19.9366 47.4931 18.0979 46.6 16.3292 45.5858C16.1893 45.5041 16.1781 45.304 16.3068 45.2082C16.679 44.9293 17.0513 44.6391 17.4067 44.3461C17.471 44.2926 17.5606 44.2813 17.6362 44.3151C29.2558 49.6202 41.8354 49.6202 53.3179 44.3151C53.3935 44.2785 53.4831 44.2898 53.5502 44.3433C53.9057 44.6363 54.2779 44.9293 54.6529 45.2082C54.7816 45.304 54.7732 45.5041 54.6333 45.5858C52.8646 46.6197 51.0259 47.4931 49.0921 48.2228C48.9662 48.2707 48.9102 48.4172 48.9718 48.5383C50.038 50.6034 51.2554 52.5699 52.5959 54.435C52.6519 54.5139 52.7526 54.5477 52.845 54.5195C58.6464 52.7249 64.529 50.0174 70.6019 45.5576C70.6551 45.5182 70.6887 45.459 70.6943 45.3942C72.1747 30.0791 68.2147 16.7757 60.1968 4.9823C60.1772 4.9429 60.1437 4.9147 60.1045 4.8978Z"/></svg>
+        邀請 UMA Info
+      </a>
+    {% else %}
+      <span class="btn-hero-primary" style="opacity:.5;cursor:default;">
+        <svg width="16" height="13" viewBox="0 0 71 55" fill="currentColor" aria-hidden="true"><path d="M60.1045 4.8978C55.5792 2.8214 50.7265 1.2916 45.6527 0.41542C45.5603 0.39851 45.468 0.440769 45.4204 0.525289C44.7963 1.6353 44.105 3.0834 43.6209 4.2216C38.1637 3.4046 32.7345 3.4046 27.3892 4.2216C26.905 3.0581 26.1886 1.6353 25.5617 0.525289C25.5141 0.443589 25.4218 0.40133 25.3294 0.41542C20.2584 1.2888 15.4057 2.8186 10.8776 4.8978C10.8384 4.9147 10.8048 4.9429 10.7825 4.9795C1.57795 18.7309 -0.943561 32.1443 0.293408 45.3914C0.299005 45.4562 0.335386 45.5182 0.385761 45.5576C6.45866 50.0174 12.3413 52.7249 18.1147 54.5195C18.2071 54.5477 18.305 54.5139 18.3638 54.4378C19.7295 52.5728 20.9469 50.6063 21.9907 48.5383C22.0523 48.4172 21.9935 48.2735 21.8676 48.2256C19.9366 47.4931 18.0979 46.6 16.3292 45.5858C16.1893 45.5041 16.1781 45.304 16.3068 45.2082C16.679 44.9293 17.0513 44.6391 17.4067 44.3461C17.471 44.2926 17.5606 44.2813 17.6362 44.3151C29.2558 49.6202 41.8354 49.6202 53.3179 44.3151C53.3935 44.2785 53.4831 44.2898 53.5502 44.3433C53.9057 44.6363 54.2779 44.9293 54.6529 45.2082C54.7816 45.304 54.7732 45.5041 54.6333 45.5858C52.8646 46.6197 51.0259 47.4931 49.0921 48.2228C48.9662 48.2707 48.9102 48.4172 48.9718 48.5383C50.038 50.6034 51.2554 52.5699 52.5959 54.435C52.6519 54.5139 52.7526 54.5477 52.845 54.5195C58.6464 52.7249 64.529 50.0174 70.6019 45.5576C70.6551 45.5182 70.6887 45.459 70.6943 45.3942C72.1747 30.0791 68.2147 16.7757 60.1968 4.9823C60.1772 4.9429 60.1437 4.9147 60.1045 4.8978Z"/></svg>
+        邀請 UMA Info（需設定 CLIENT_ID）
+      </span>
+    {% endif %}
+
+    {% if user %}
+      <a class="btn-hero-outline" href="{% url 'app_uma_info_portal:servers' %}">
+        ⚙️ 管理伺服器
+      </a>
+    {% else %}
+      <a class="btn-hero-outline" href="{% url 'app_uma_info_portal:auth_login' %}">
+        <svg width="14" height="11" viewBox="0 0 71 55" fill="currentColor" aria-hidden="true"><path d="M60.1045 4.8978C55.5792 2.8214 50.7265 1.2916 45.6527 0.41542C45.5603 0.39851 45.468 0.440769 45.4204 0.525289C44.7963 1.6353 44.105 3.0834 43.6209 4.2216C38.1637 3.4046 32.7345 3.4046 27.3892 4.2216C26.905 3.0581 26.1886 1.6353 25.5617 0.525289C25.5141 0.443589 25.4218 0.40133 25.3294 0.41542C20.2584 1.2888 15.4057 2.8186 10.8776 4.8978C10.8384 4.9147 10.8048 4.9429 10.7825 4.9795C1.57795 18.7309 -0.943561 32.1443 0.293408 45.3914C0.299005 45.4562 0.335386 45.5182 0.385761 45.5576C6.45866 50.0174 12.3413 52.7249 18.1147 54.5195C18.2071 54.5477 18.305 54.5139 18.3638 54.4378C19.7295 52.5728 20.9469 50.6063 21.9907 48.5383C22.0523 48.4172 21.9935 48.2735 21.8676 48.2256C19.9366 47.4931 18.0979 46.6 16.3292 45.5858C16.1893 45.5041 16.1781 45.304 16.3068 45.2082C16.679 44.9293 17.0513 44.6391 17.4067 44.3461C17.471 44.2926 17.5606 44.2813 17.6362 44.3151C29.2558 49.6202 41.8354 49.6202 53.3179 44.3151C53.3935 44.2785 53.4831 44.2898 53.5502 44.3433C53.9057 44.6363 54.2779 44.9293 54.6529 45.2082C54.7816 45.304 54.7732 45.5041 54.6333 45.5858C52.8646 46.6197 51.0259 47.4931 49.0921 48.2228C48.9662 48.2707 48.9102 48.4172 48.9718 48.5383C50.038 50.6034 51.2554 52.5699 52.5959 54.435C52.6519 54.5139 52.7526 54.5477 52.845 54.5195C58.6464 52.7249 64.529 50.0174 70.6019 45.5576C70.6551 45.5182 70.6887 45.459 70.6943 45.3942C72.1747 30.0791 68.2147 16.7757 60.1968 4.9823C60.1772 4.9429 60.1437 4.9147 60.1045 4.8978Z"/></svg>
+        以 Discord 登入
+      </a>
+    {% endif %}
+  </div>
+
+  <div class="hero-scroll" aria-hidden="true">
+    <span>功能介紹</span>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+  </div>
+</section>
+
+<!-- ── 統計列 ────────────────────────────────────────────────────────────── -->
+<div class="stats-bar">
+  <div class="stat-item">
+    <div class="stat-value">{{ guild_count }}+</div>
+    <div class="stat-label">伺服器安裝</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-value">每日</div>
+    <div class="stat-label">自動情報推播</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-value">AI</div>
+    <div class="stat-label">@mention 即時問答</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-value">免費</div>
+    <div class="stat-label">零費用開始使用</div>
+  </div>
+</div>
+
+<!-- ── 功能介紹 ─────────────────────────────────────────────────────────── -->
+<section class="features" id="features">
+  <div class="features-header">
+    <h2>一鍵邀請，立即生效</h2>
+    <p>無需複雜設定，幾個點擊就能讓你的伺服器自動接收最新賽馬娘情報</p>
+  </div>
+
+  <!-- 功能 1：每日情報推播 -->
+  <div class="feature-row">
+    <div class="feature-text">
+      <div class="feature-badge">📰 情報推播</div>
+      <h3>每日自動推播<br>賽馬娘最新情報</h3>
+      <p>Bot 每天定時整理日版公告、活動、新馬娘、故事等最新資訊，透過 AI 生成精簡摘要，直接推送到你指定的頻道。</p>
+      <ul class="feature-list">
+        <li>自動整理日版官方公告與活動</li>
+        <li>AI 生成精簡中文摘要（活潑或簡潔語氣可選）</li>
+        <li>自訂推播時間（整點）與推播頻率</li>
+        <li>支援 @身分組 通知</li>
+      </ul>
+    </div>
+    <div class="feature-visual">
+      <div class="discord-mockup">
+        <div class="dm-header">
+          <div class="dm-bot-avatar" aria-hidden="true">U</div>
+          <div>
+            <div class="dm-bot-name">UMA Info <span class="dm-bot-tag">BOT</span></div>
+            <div style="font-size:.72rem;color:#72767d;">今天 20:00</div>
+          </div>
+        </div>
+        <div class="dm-embed">
+          <div class="dm-embed-title">📰 每日賽馬娘情報摘要</div>
+          <div class="dm-embed-desc">
+            ✦ 新公告：「<strong style="color:#e8c765">煌閃傳說 Rainbow</strong>」活動開跑，限定支援卡同步實裝！<br>
+            ✦ 排名賽：本週達成獎勵更新，金幣上限提升至 <strong style="color:#e8c765">50,000</strong>。<br>
+            ✦ 情報：新馬娘「暗夜小馬」已確認實裝時程。
+          </div>
+          <div class="dm-embed-foot">UMA Info Bot • 2026-06-24 20:00</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 功能 2：AI 問答 -->
+  <div class="feature-row reverse">
+    <div class="feature-text">
+      <div class="feature-badge">🤖 AI 問答</div>
+      <h3>@UMA Info<br>即時解答你的疑惑</h3>
+      <p>直接在頻道 @ 提及 UMA Info，AI 會結合最新情報資料庫即時回覆賽馬娘相關問題，不用離開 Discord。</p>
+      <ul class="feature-list">
+        <li>支援繁體中文自然語言提問</li>
+        <li>結合最新公告資料庫（RAG）</li>
+        <li>回答馬娘能力值、適性、培育建議等</li>
+        <li>每日使用額度可由伺服器管理員設定</li>
+      </ul>
+    </div>
+    <div class="feature-visual">
+      <div class="discord-mockup">
+        <div class="dm-chat-bubble">
+          <div class="dm-chat-user">玩家 Lrniey</div>
+          <div class="dm-chat-text">@UMA Info 新活動的限定支援卡強嗎？值得抽嗎？</div>
+        </div>
+        <div class="dm-chat-bot-bubble">
+          <div class="dm-chat-user">UMA Info <span class="dm-bot-tag">BOT</span></div>
+          <div class="dm-chat-bot-text">
+            根據最新公告，「煌閃傳說 Rainbow」活動限定的 <strong style="color:#e8c765">SSR 支援卡</strong> 評級相當高！特別是速度＋爆發組合在 UR 時代依然搶手，建議有石的玩家可以考慮衝單保底。
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 功能 3：彈性頻道設定 -->
+  <div class="feature-row">
+    <div class="feature-text">
+      <div class="feature-badge">⚙️ 彈性設定</div>
+      <h3>完全掌控<br>Bot 的讀取範圍</h3>
+      <p>依照你的伺服器結構，靈活設定 Bot 要監聽哪些頻道、要推播到哪個頻道、要 Ping 哪個身分組，所有設定都在本站管理介面完成。</p>
+      <ul class="feature-list">
+        <li>全頻道 / 僅公告 / 指定單頻道 / 進階 Allow-Deny</li>
+        <li>視覺化頻道選擇器（下拉選單）</li>
+        <li>身分組 Ping 通知設定</li>
+        <li>多管理員協作支援（變更稽核記錄）</li>
+      </ul>
+    </div>
+    <div class="feature-visual">
+      <div class="settings-mockup">
+        <div class="sm-title">頻道讀取範圍設定</div>
+        <div class="sm-row">
+          <span>全部頻道</span>
+          <span class="sm-x">✕</span>
+        </div>
+        <div class="sm-row">
+          <span>僅公告頻道</span>
+          <span class="sm-check">✓</span>
+        </div>
+        <div class="sm-row">
+          <span>指定單一頻道</span>
+          <span class="sm-x">✕</span>
+        </div>
+        <div class="sm-row">
+          <span>進階 Allow/Deny</span>
+          <span class="sm-x">✕</span>
+        </div>
+        <div style="margin-top:16px;" class="sm-title">推播設定</div>
+        <div class="sm-row">
+          <span>推播頻道</span>
+          <span class="sm-tag">#uma-news</span>
+        </div>
+        <div class="sm-row">
+          <span>Ping 身分組</span>
+          <span class="sm-tag">@馬娘迷</span>
+        </div>
+        <div class="sm-row">
+          <span>推播時間</span>
+          <span class="sm-tag">每日 20:00</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── CTA ───────────────────────────────────────────────────────────────── -->
+<section class="cta-section">
+  <div class="cta-card">
+    <div class="cta-icon" aria-hidden="true">U</div>
+    <h2>現在就加入 UMA Info</h2>
+    <p>幾秒鐘完成邀請，立刻讓你的伺服器自動接收最新賽馬娘情報。完全免費。</p>
+    <div class="d-flex gap-3 justify-content-center flex-wrap">
+      {% if client_id_set %}
+        <a class="btn-hero-primary" href="{{ invite_url }}" target="_blank" rel="noopener">邀請 UMA Info Bot</a>
+      {% endif %}
+      {% if user %}
+        <a class="btn-hero-outline" href="{% url 'app_uma_info_portal:servers' %}">管理我的伺服器</a>
+      {% else %}
+        <a class="btn-hero-outline" href="{% url 'app_uma_info_portal:auth_login' %}">以 Discord 登入管理</a>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<!-- error toast -->
+{% if request.GET.error %}
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index:9999;">
+  <div class="toast show align-items-center text-bg-danger border-0" role="alert">
+    <div class="d-flex">
+      <div class="toast-body">登入失敗：{{ request.GET.error }}</div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,403 @@
+{% extends "base.html" %}
+
+{% block title %}Agentic RAG 知識助理 — 賽馬娘資訊平台{% endblock %}
+
+{% block extra_css %}
+<style>
+  .chat-container {
+    display: flex;
+    flex-direction: column;
+    height: 72vh;
+    min-height: 420px;
+  }
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1rem;
+    background-color: var(--color-bg-base);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    scroll-behavior: smooth;
+  }
+  .message-row {
+    display: flex;
+    margin-bottom: 0.85rem;
+    gap: 0.6rem;
+    animation: page-fadein 0.25s ease both;
+  }
+  .message-row.user-row { flex-direction: row-reverse; }
+  .avatar {
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+    background-color: var(--color-accent-muted);
+  }
+  .user-row .avatar { background-color: var(--color-accent); color: #fff; }
+  .bubble {
+    max-width: 78%;
+    padding: 0.6rem 0.9rem;
+    border-radius: 12px;
+    font-size: 0.92rem;
+    line-height: 1.65;
+    word-break: break-word;
+    background-color: var(--color-bg-surface);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-primary);
+  }
+  .user-row .bubble {
+    background-color: var(--color-accent);
+    border-color: var(--color-accent);
+    color: #fff;
+    border-radius: 12px 12px 2px 12px;
+  }
+  .bot-row .bubble {
+    border-radius: 2px 12px 12px 12px;
+  }
+  .bubble p { margin-bottom: 0.4rem; }
+  .bubble p:last-child { margin-bottom: 0; }
+  .bubble pre {
+    background: var(--color-bg-base);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    padding: 0.5rem 0.75rem;
+    overflow-x: auto;
+    font-size: 0.82rem;
+  }
+  .bubble code {
+    background: var(--color-bg-base);
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-size: 0.85em;
+  }
+  .sender-name {
+    font-size: 0.72rem;
+    font-weight: 600;
+    margin-bottom: 2px;
+    color: var(--color-text-secondary);
+    padding-left: 2px;
+  }
+  .typing-indicator {
+    display: flex; align-items: center; gap: 4px;
+    padding: 0.5rem 0.75rem;
+  }
+  .typing-indicator span {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--color-accent);
+    animation: typing-bounce 1.2s infinite;
+  }
+  .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+  .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes typing-bounce {
+    0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+    40% { transform: translateY(-6px); opacity: 1; }
+  }
+  .chat-input-area {
+    margin-top: 0.75rem;
+    display: flex; gap: 0.5rem; align-items: flex-end;
+  }
+  .chat-input-area textarea {
+    flex: 1;
+    resize: none;
+    min-height: 48px;
+    max-height: 120px;
+    border-radius: 8px;
+    padding: 0.6rem 0.85rem;
+    font-size: 0.92rem;
+    line-height: 1.5;
+    transition: border-color 0.2s;
+  }
+  .tool-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 0.76rem; padding: 2px 10px;
+    border-radius: 20px;
+    background: var(--color-accent-muted);
+    color: var(--color-accent);
+    font-weight: 600;
+    border: 1px solid color-mix(in srgb, var(--color-accent) 30%, transparent);
+  }
+  .history-badge {
+    font-size: 0.72rem;
+    color: var(--color-text-disabled);
+    text-align: center;
+    margin-top: 4px;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="col-lg-12 mt-3">
+
+  <!-- Page Header -->
+  <div class="d-flex align-items-center gap-3 mb-3">
+    <div>
+      <h2 class="mb-1" style="font-size:1.4rem;">🤖 Agentic RAG 知識助理</h2>
+      <p class="text-muted mb-0" style="font-size:0.88rem;">
+        結合語意搜尋與資料庫精確查詢，由 AI Agent 動態決定工具策略
+      </p>
+    </div>
+  </div>
+
+  <!-- Tool Badges -->
+  <div class="d-flex flex-wrap gap-2 mb-3">
+    <span class="tool-badge">🔍 語意搜尋 (FAISS + Gemini Embedding)</span>
+    <span class="tool-badge">🗃 精確查詢 (GameAnnouncement DB)</span>
+    <span class="tool-badge">✨ {{ model_name }}</span>
+  </div>
+
+  <div class="row g-3">
+    <!-- Chat Panel -->
+    <div class="col-lg-8">
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center py-2">
+          <span style="font-weight:600;font-size:0.93rem;">💬 對話視窗</span>
+          <button id="clearBtn" class="btn btn-sm"
+                  style="color:var(--color-negative);font-size:0.8rem;border:1px solid var(--color-border);">
+            🗑 清除對話
+          </button>
+        </div>
+        <div class="card-body p-2">
+          <div class="chat-container">
+            <div class="chat-messages" id="chatMessages">
+              <!-- 歡迎訊息 -->
+              <div class="message-row bot-row">
+                <div class="avatar">🤖</div>
+                <div>
+                  <div class="sender-name">馬娘 Agentic RAG</div>
+                  <div class="bubble">
+                    你好！我是 <strong>馬娘 Agentic RAG 助理</strong>，我可以：<br>
+                    🔍 語意搜尋知識庫（FAISS 索引）<br>
+                    🗃 精確查詢資料庫公告（依分類）<br>
+                    <br>
+                    試試問我：「最新的活動公告有哪些？」或「轉輪娘的技能介紹」
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="chat-input-area">
+              <textarea id="userInput" class="form-control"
+                        placeholder="輸入問題，按 Enter 送出（Shift+Enter 換行）..."
+                        rows="2"></textarea>
+              <button id="sendBtn" class="btn btn-primary px-3" style="height:48px;">
+                送出
+              </button>
+            </div>
+          </div>
+          <div class="history-badge" id="historyBadge"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Info Panel -->
+    <div class="col-lg-4">
+      <div class="card mb-3">
+        <div class="card-header py-2">
+          <span style="font-weight:600;font-size:0.88rem;">🛠 工具說明</span>
+        </div>
+        <div class="card-body" style="font-size:0.85rem;">
+          <div class="mb-3">
+            <strong style="color:var(--color-accent);">search_uma_announcements</strong>
+            <p class="text-muted mt-1 mb-0">
+              以語意相似度搜尋 FAISS 知識庫，同時查詢 DB 標題/內容，適合模糊或概念性問題。
+            </p>
+          </div>
+          <hr style="border-color:var(--color-border);">
+          <div>
+            <strong style="color:var(--color-accent);">list_announcements_by_category</strong>
+            <p class="text-muted mt-1 mb-0">
+              精確依分類列出最新公告。<br>
+              可用分類：<code>活動</code>、<code>卡池</code>、<code>競賽</code>、<code>系統</code>、<code>其他</code>
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header py-2">
+          <span style="font-weight:600;font-size:0.88rem;">💡 提示範例</span>
+        </div>
+        <div class="card-body p-0">
+          <div class="list-group list-group-flush" style="font-size:0.83rem;">
+            <button class="list-group-item list-group-item-action example-prompt"
+                    data-prompt="最新的活動公告有哪些？">
+              📢 最新的活動公告有哪些？
+            </button>
+            <button class="list-group-item list-group-item-action example-prompt"
+                    data-prompt="請列出最近 5 筆卡池公告">
+              🎴 請列出最近 5 筆卡池公告
+            </button>
+            <button class="list-group-item list-group-item-action example-prompt"
+                    data-prompt="Special Week 的技能介紹">
+              🐎 Special Week 的技能介紹
+            </button>
+            <button class="list-group-item list-group-item-action example-prompt"
+                    data-prompt="競賽模式有什麼規則？">
+              🏆 競賽模式有什麼規則？
+            </button>
+            <button class="list-group-item list-group-item-action example-prompt"
+                    data-prompt="最近有什麼系統維護公告？">
+              🔧 最近有什麼系統維護公告？
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script>
+(function () {
+  const chatMessages = document.getElementById('chatMessages');
+  const userInput   = document.getElementById('userInput');
+  const sendBtn     = document.getElementById('sendBtn');
+  const clearBtn    = document.getElementById('clearBtn');
+  const historyBadge = document.getElementById('historyBadge');
+
+  const CHAT_URL  = "{% url 'app_rag_agent:api_chat' %}";
+  const CLEAR_URL = "{% url 'app_rag_agent:api_clear_history' %}";
+
+  marked.setOptions({ breaks: true, gfm: true });
+
+  function scrollBottom() {
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+
+  function addMessage(role, text) {
+    const isUser = role === 'user';
+    const row = document.createElement('div');
+    row.className = 'message-row ' + (isUser ? 'user-row' : 'bot-row');
+
+    const avatar = document.createElement('div');
+    avatar.className = 'avatar';
+    avatar.textContent = isUser ? '👤' : '🤖';
+
+    const wrap = document.createElement('div');
+
+    if (!isUser) {
+      const name = document.createElement('div');
+      name.className = 'sender-name';
+      name.textContent = '馬娘 Agentic RAG';
+      wrap.appendChild(name);
+    }
+
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    if (isUser) {
+      bubble.textContent = text;
+    } else {
+      bubble.innerHTML = marked.parse(text);
+    }
+    wrap.appendChild(bubble);
+
+    row.appendChild(avatar);
+    row.appendChild(wrap);
+    chatMessages.appendChild(row);
+    scrollBottom();
+    return bubble;
+  }
+
+  function addTyping() {
+    const row = document.createElement('div');
+    row.className = 'message-row bot-row';
+    row.id = 'typingRow';
+
+    const avatar = document.createElement('div');
+    avatar.className = 'avatar';
+    avatar.textContent = '🤖';
+
+    const wrap = document.createElement('div');
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.innerHTML = '<div class="typing-indicator"><span></span><span></span><span></span></div>';
+    wrap.appendChild(bubble);
+    row.appendChild(avatar);
+    row.appendChild(wrap);
+    chatMessages.appendChild(row);
+    scrollBottom();
+  }
+
+  function removeTyping() {
+    const el = document.getElementById('typingRow');
+    if (el) el.remove();
+  }
+
+  function setLoading(loading) {
+    sendBtn.disabled = loading;
+    userInput.disabled = loading;
+    sendBtn.textContent = loading ? '…' : '送出';
+  }
+
+  async function sendMessage() {
+    const msg = userInput.value.trim();
+    if (!msg) return;
+    userInput.value = '';
+    userInput.style.height = 'auto';
+
+    addMessage('user', msg);
+    addTyping();
+    setLoading(true);
+
+    try {
+      const res = await fetch(CHAT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: msg })
+      });
+      const data = await res.json();
+      removeTyping();
+      if (data.error) {
+        addMessage('bot', '❌ 錯誤：' + data.error);
+      } else {
+        addMessage('bot', data.reply || '（無回覆）');
+        if (data.history_len !== undefined) {
+          historyBadge.textContent = '對話輪數：' + data.history_len;
+        }
+      }
+    } catch (e) {
+      removeTyping();
+      addMessage('bot', '❌ 網路錯誤，請稍後再試。');
+    } finally {
+      setLoading(false);
+      userInput.focus();
+    }
+  }
+
+  sendBtn.addEventListener('click', sendMessage);
+
+  userInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+
+  userInput.addEventListener('input', function () {
+    this.style.height = 'auto';
+    this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+  });
+
+  clearBtn.addEventListener('click', async function () {
+    if (!confirm('確定要清除對話歷史嗎？')) return;
+    await fetch(CLEAR_URL, { method: 'POST' });
+    chatMessages.innerHTML = '';
+    historyBadge.textContent = '';
+    addMessage('bot', '對話歷史已清除。你可以重新開始提問！');
+  });
+
+  document.querySelectorAll('.example-prompt').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      userInput.value = this.dataset.prompt;
+      userInput.focus();
+      userInput.dispatchEvent(new Event('input'));
+    });
+  });
+
+})();
+</script>
+{% endblock %}

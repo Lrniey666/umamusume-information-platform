@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+  <head>
+    <title>輿情分析平台</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  </head>
+  <body>
+    <div class="container">
+      <div class="row">
+        <!-- Navigation Bar -->
+        <div class="col-lg-12 mb-2">
+          <nav class="navbar navbar-expand-lg navbar-light" style="background-color: #e3f2fd">
+            <div class="container-fluid">
+              <a class="navbar-brand" href="#">輿情大數據</a>
+              <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation"><span class="navbar-toggler-icon"></span></button>
+
+              <div class="collapse navbar-collapse" id="navbarSupportedContent">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                  <li class="nav-item">
+                    <a class="nav-link" href="#">政治人物聲量排行榜</a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link" href="#">政黨聲量排行榜</a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link" href="{% url 'app_top_keyword:home' %}">熱門關鍵詞分析</a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link" href="#">昨日熱門關鍵字</a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link" href="#">熱門人物排行分析</a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link" href="#">NER熱門分析</a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link" href="#">你的關鍵詞熱門度分析</a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link" href="#">全文檢索與關聯新聞分析</a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link" href="#">你的關鍵詞情緒分析</a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link" href="#">今日新聞瀏覽與新聞推薦</a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link" href="#">新聞或文章情緒分類</a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link" href="#">新聞分類新聞分類</a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link" href="#">課程介紹網頁</a>
+                  </li>
+                  <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">會員獨享功能</a>
+                    <ul class="dropdown-menu" aria-labelledby="navbarDropdown">
+                      <li>
+                        <a class="dropdown-item" href="#">長時間(超過3個月)監控分析(收費標準)</a>
+                      </li>
+                      <li>
+                        <a class="dropdown-item" href="#">自訂分析功能(收費標準)</a>
+                      </li>
+                      <li>
+                        <a class="dropdown-item" href="#">更多資料庫分析(收費標準)</a>
+                      </li>
+                      <li>
+                        <hr class="dropdown-divider" />
+                      </li>
+                      <li>
+                        <a class="dropdown-item" href="#">為你訂製輿情分析任務(報價)</a>
+                      </li>
+                    </ul>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </nav>
+        </div>
+        <!-- End of Navigation Bar -->
+
+        <!-- Main Content -->
+
+        <div class="col-lg-12">
+          <h1>各類新聞最熱門的關鍵詞</h1>
+          <p>熱門度分析:可以了解新聞關注那些重要的東東</p>
+        </div>
+
+        <!-- 新聞類別選單--- -->
+        <div class="col-lg-6 mb-2">
+          <div class="card">
+            <div class="card-header">
+              <h3 class="h6 text-uppercase mb-0">熱門關鍵字瀏覽與繪圖(資料週期:資料截止時間的前4周)</h3>
+            </div>
+
+            <div class="card-body">
+              <!-- 新聞類別選單 form group -->
+              <div class="mb-3 row">
+                <label class="col-sm-3 form-label">新聞類別</label>
+                <div class="col-md-9">
+                  <select id="cate-selected" name="news_category" class="form-select">
+                    <!-- <option>請選擇</option> -->
+                    <option>全部</option>
+                    <option>政治</option>
+                    <option>科技</option>
+                    <option>娛樂</option>
+                    <option>運動</option>
+                    <option>生活</option>
+                    <option>產經</option>
+                    <option>證卷</option>
+                    <option>國際</option>
+                    <option>社會</option>
+                    <option>文化</option>
+                    <option>兩岸</option>
+                  </select>
+                  <div class="form-text">請選擇新聞類別</div>
+                </div>
+              </div>
+              <!-- form group -->
+
+              <!-- 熱門詞多少個?form group -->
+              <div class="mb-3 row">
+                <label class="col-md-3 form-label">多少個熱門詞?</label>
+                <div class="col-md-9">
+                  <input id="topk-selected" name="topk" value="10" class="form-control" />
+                  <div class="form-text">內定值為10</div>
+                </div>
+              </div>
+              <!-- form group -->
+
+              <!-- submit按鈕form group -->
+              <div class="mb-3 row">
+                <div class="col-md-9 ms-auto">
+                  <button type="button" id="btn-ok" class="btn btn-primary">查詢</button>
+                </div>
+              </div>
+              <!-- form group -->
+            </div>
+            <!-- card body -->
+          </div>
+          <!-- column -->
+        </div>
+        <!-- 區塊結束 -->
+
+        <!-- 繪圖區塊--- -->
+        <div class="col-lg-6 mb-5">
+          <div class="card">
+            <div class="card-header">
+              <h3 class="h6 text-uppercase mb-0">熱門關鍵字繪圖</h3>
+            </div>
+            <div class="card-body">
+              <canvas id="mychart"></canvas>
+            </div>
+          </div>
+        </div>
+        <!-- 區塊結束 -->
+
+        <!-- 熱門關鍵字區塊--- -->
+        <div class="col-lg-6 mb-5">
+          <div class="card">
+            <div class="card-header">
+              <h3 class="h6 text-uppercase mb-0">熱門關鍵字</h3>
+            </div>
+            <div class="card-body">
+              <ul id="topkeys"></ul>
+            </div>
+          </div>
+        </div>
+        <!-- 區塊結束 -->
+      </div>
+    </div> <!-- container -->
+
+    <!-- Bootstrap 5 JS Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- Additional Scripts -->
+    <!-- chartjs圖js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.3/Chart.min.js"></script>
+
+    <!-- 程式碼區 -->
+    <script>
+      // Show default top words bar chart when the page is loaded.
+      // Invoke callAjax() after the function is defined, unless callAjax() is defined with "hoisting"
+      callAjax()
+      
+      //*新聞類別選單select被選中值有改變時，執行以下事件
+      //$('#cate-selected').on('change', callAjax() );
+      $('#cate-selected').on('change', function () {
+        callAjax()
+      }) //event function
+      
+      //**按鈕事件
+      $('#btn-ok').on('click', function () {
+        callAjax()
+      }) //event function
+      
+      // ** draw chart using Ajax 畫圖
+      // There are two ways to define a function:
+      // one is expression, and the other is definition with "hoisting"
+      // function with hoisting:  function callAjax() {}
+      // normal function expression: let callAjax = function() {}
+      
+      // Define callAjax function with hoisting
+      // callAjax()這樣定義可以在被定義前就被使用 跟我們在Java裡面的函數用法一樣!
+      
+      //let callAjax = function() {
+      function callAjax() {
+        let cate = $('#cate-selected').val()
+        //console.log(cate);
+      
+        let topk = $('#topk-selected').val()
+        //console.log(topk);
+      
+        $.ajax({
+          type: 'POST',
+      
+          //url: "/topword/api_get_cate_topword/",
+          url: 'http://127.0.0.1:8000/topword/api_get_cate_topword/',
+          //url: "http://163.18.23.21:8000/topword/api_get_cate_topword/",
+          //url: "api_get_cate_topword/", //Not recommended!
+      
+          data: {
+            news_category: cate,
+            topk: topk
+          },
+          success: function (received) {
+            //console.log(received);
+            let chart_data = received.chart_data
+            let wf_pairs = received.wf_pairs
+            console.log(wf_pairs)
+            showTopKeys(wf_pairs)
+            showChart(chart_data)
+          } //success function
+        }) //ajax
+      } //callAjax
+      
+      //* 顯示關鍵詞資料函數
+      function showTopKeys(items) {
+        //先清除前一次的資料
+        $('#topkeys').empty()
+      
+        //將內容加上li標籤附加起來，顯示在顯示區"topkeys"
+        for (let i = 0; i < items.length; i++) {
+          let item_li = '<li>' + items[i] + '</li>'
+          $('#topkeys').append(item_li)
+        }
+      } //function
+      
+      //**繪圖函數showChart()
+      function showChart(chart_data) {
+        // 畫圖需要的數據資料
+        let values = chart_data.values
+        let labels = chart_data.labels
+        let category = chart_data.category
+      
+        //第1個變數: 餵給chart的資料
+        let data = {
+          labels: labels,
+          datasets: [
+            {
+              label: category,
+              data: values,
+              backgroundColor: randomColors(values.length),
+              borderColor: randomColors(values.length),
+              borderWidth: 1
+            }
+          ]
+        }
+      
+        //第2個變數: chart的選項  指定y坐標軸從零開始顯示
+        let options = {
+          scales: {
+            y: {
+              beginAtZero: true
+            }
+          }
+        }
+      
+        //取得在前面html區域欲顯示的圖代號
+        let canvas_mychrat = document.getElementById('mychart')
+      
+        //**先清除前一個圖 再繪新圖
+        // 可以印出barchart物件是否存在
+        // console.log(window.barchart);
+        //先清除前一個圖 再繪新圖 if 有以下兩種寫法皆可
+        // if (window.barchart)  //若存在則為true
+        // if (typeof (barchart) != "undefined"){
+        if (window.barchart) {
+          barchart.destroy()
+        }
+      
+        //**繪圖(產生一個圖物件變數名稱為barchart)
+        // 必須全域變數--注意:前面不要有let, var, const等修飾詞
+        // 理由: 我們要讓它存在於網頁全域變數，
+        // 這樣我們才方便判斷是否有前一次的圖，如果存在有，要刪除之，否則，很多張圖會疊在一起
+        barchart = new Chart(canvas_mychrat, {
+          type: 'bar',
+          data: data,
+          options: options
+        })
+      
+        //** 產生隨機顏色
+        function randomColors(num_colors) {
+          let colors = []
+      
+          for (i = 0; i < num_colors; i++) {
+            let r = Math.floor(Math.random() * 255)
+            let g = Math.floor(Math.random() * 255)
+            let b = Math.floor(Math.random() * 255)
+            let rgb = `rgba(${r},${g},${b},0.5)` // (red, green, blue, alfa) alfa透明度
+      
+            colors.push(rgb)
+          }
+          return colors
+        }
+      } //show chart function
+      
+      // document就是這個網頁HTML所有的元素
+      // window就是這個網頁的全域變數global variables:有一大堆，我們自己定義的有callAjax, showChart, barchart等
+      // 把document, window印出來看看就能理解它們是甚麼
+      //console.log(document);
+      //console.log(window);
+    </script>
+  </body>
+</html>

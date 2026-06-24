@@ -1,0 +1,285 @@
+{% extends 'app_uma_info_portal/base_portal.html' %}
+{% load static %}
+
+{% block title %}選擇伺服器 — UMA Info{% endblock %}
+
+{% block extra_css %}
+<style>
+  .servers-shell {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+  }
+  .servers-header {
+    margin-bottom: 36px;
+  }
+  .servers-header h1 {
+    font-size: 1.9rem;
+    font-weight: 900;
+    letter-spacing: -.03em;
+    margin-bottom: 6px;
+  }
+  .servers-header p {
+    color: var(--color-text-secondary);
+    font-size: .95rem;
+  }
+
+  /* ── 伺服器卡片網格 ────────────────────────────────── */
+  .section-label {
+    font-size: .78rem;
+    font-weight: 700;
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--color-border);
+  }
+
+  .guild-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 48px;
+  }
+
+  .guild-card {
+    background: var(--color-bg-elevated);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px;
+    text-align: center;
+    transition: border-color .2s, transform .15s, box-shadow .2s;
+    cursor: pointer;
+    text-decoration: none;
+    color: var(--color-text-primary);
+    position: relative;
+  }
+  .guild-card:hover {
+    border-color: var(--color-accent);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 28px var(--color-shadow-md);
+    color: var(--color-text-primary);
+  }
+
+  /* 伺服器安裝標識 */
+  .guild-card.installed::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(135deg, rgba(88,101,242,.06) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .guild-card.installed {
+    border-color: rgba(88,101,242,.4);
+  }
+
+  .guild-icon {
+    width: 72px;
+    height: 72px;
+    border-radius: 24px;
+    object-fit: cover;
+    margin-bottom: 14px;
+    flex-shrink: 0;
+  }
+  .guild-icon-fallback {
+    width: 72px;
+    height: 72px;
+    border-radius: 24px;
+    margin-bottom: 14px;
+    flex-shrink: 0;
+    background: linear-gradient(135deg, var(--color-accent-soft), var(--color-bg-elevated));
+    border: 2px solid var(--color-border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.8rem;
+    font-weight: 900;
+    color: var(--color-accent);
+  }
+  .guild-name {
+    font-weight: 700;
+    font-size: .92rem;
+    line-height: 1.3;
+    margin-bottom: 8px;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+  .guild-status {
+    font-size: .78rem;
+    color: var(--color-text-disabled);
+    margin-bottom: 16px;
+  }
+  .guild-status.active {
+    color: var(--color-positive);
+    font-weight: 600;
+  }
+
+  .btn-manage {
+    width: 100%;
+    padding: 8px;
+    border-radius: var(--radius-md);
+    background: #5865F2;
+    color: #fff;
+    font-size: .82rem;
+    font-weight: 700;
+    border: none;
+    cursor: pointer;
+    text-decoration: none;
+    display: block;
+    text-align: center;
+    transition: opacity .2s;
+  }
+  .btn-manage:hover { opacity: .88; color:#fff; }
+  .btn-invite {
+    width: 100%;
+    padding: 8px;
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--color-text-secondary);
+    font-size: .82rem;
+    font-weight: 600;
+    border: 1px solid var(--color-border);
+    cursor: pointer;
+    text-decoration: none;
+    display: block;
+    text-align: center;
+    transition: border-color .2s, color .2s;
+  }
+  .btn-invite:hover { border-color: #5865F2; color: #5865F2; }
+
+  /* 空狀態 */
+  .empty-state {
+    text-align: center;
+    padding: 40px 24px;
+    color: var(--color-text-secondary);
+  }
+  .empty-state .icon { font-size: 3rem; margin-bottom: 12px; }
+  .empty-state h3 { font-weight: 700; font-size: 1.1rem; margin-bottom: 6px; color: var(--color-text-primary); }
+
+  /* 用戶資訊 */
+  .user-info-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 20px;
+    background: var(--color-bg-elevated);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    margin-bottom: 36px;
+    font-size: .9rem;
+  }
+  .user-info-bar img {
+    width: 40px; height: 40px;
+    border-radius: 50%; object-fit: cover;
+  }
+  .user-info-bar .meta { color: var(--color-text-secondary); font-size: .82rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="servers-shell">
+
+  <!-- 用戶資訊 -->
+  <div class="user-info-bar">
+    {% if user.avatar_hash %}
+      <img src="{{ user.avatar_url }}" alt="{{ user.username }}頭像" />
+    {% else %}
+      <span style="width:40px;height:40px;border-radius:50%;background:var(--color-accent-soft);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;">👤</span>
+    {% endif %}
+    <div>
+      <div class="fw-bold">{{ user.username }}</div>
+      <div class="meta">共找到 {{ total_manageable }} 個你擁有管理員權限的伺服器</div>
+    </div>
+    <a href="{% url 'app_uma_info_portal:auth_logout' %}" class="ms-auto btn btn-sm" style="border:1px solid var(--color-border);color:var(--color-text-secondary);border-radius:var(--radius-pill);font-size:.8rem;">登出</a>
+  </div>
+
+  <div class="servers-header">
+    <h1>選擇要管理的伺服器</h1>
+    <p>選擇一個已安裝 UMA Info 的伺服器進行設定，或邀請 Bot 加入新伺服器。</p>
+  </div>
+
+  <!-- ── 已安裝的伺服器 ───────────────────────────────────── -->
+  <div class="section-label">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+    已安裝 UMA Info（{{ installed_guilds|length }}）
+  </div>
+
+  {% if installed_guilds %}
+    <div class="guild-grid">
+      {% for guild in installed_guilds %}
+        <a href="{% url 'app_uma_info_portal:server_manage' guild.guild_id %}" class="guild-card installed">
+          {% if guild.icon_hash %}
+            <img class="guild-icon" src="{{ guild.icon_url }}" alt="{{ guild.name }}" loading="lazy"
+                 onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" />
+            <div class="guild-icon-fallback" style="display:none;">{{ guild.name|first|upper }}</div>
+          {% else %}
+            <div class="guild-icon-fallback">{{ guild.name|first|upper }}</div>
+          {% endif %}
+          <div class="guild-name">{{ guild.name }}</div>
+          <div class="guild-status active">● Bot 運行中{% if guild.msg_count %} · 已收集 {{ guild.msg_count }} 則訊息{% endif %}</div>
+          <span class="btn-manage">管理設定 →</span>
+        </a>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-state">
+      <div class="icon">🤖</div>
+      <h3>尚未在任何伺服器安裝 UMA Info</h3>
+      <p>點擊下方卡片邀請 Bot 加入你的伺服器</p>
+    </div>
+  {% endif %}
+
+  <!-- ── 可邀請的伺服器 ────────────────────────────────────── -->
+  {% if not_installed %}
+    <div class="section-label">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+      可邀請安裝（{{ not_installed|length }}）
+    </div>
+
+    <div class="guild-grid">
+      {% for guild in not_installed %}
+        <div class="guild-card">
+          {% if guild.icon %}
+            <img class="guild-icon"
+                 src="https://cdn.discordapp.com/icons/{{ guild.id }}/{{ guild.icon }}.png"
+                 alt="{{ guild.name }}" loading="lazy"
+                 onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" />
+            <div class="guild-icon-fallback" style="font-size:1.6rem;display:none;">{{ guild.name|first|upper }}</div>
+          {% else %}
+            <div class="guild-icon-fallback" style="font-size:1.6rem;">{{ guild.name|first|upper }}</div>
+          {% endif %}
+          <div class="guild-name">{{ guild.name }}</div>
+          <div class="guild-status">未安裝 Bot</div>
+          <a class="btn-invite"
+             href="{{ invite_url }}&guild_id={{ guild.id }}"
+             target="_blank" rel="noopener">邀請 UMA Info ↗</a>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  {% if not installed_guilds and not not_installed %}
+    <div class="empty-state" style="margin-top:40px;">
+      <div class="icon">😕</div>
+      <h3>找不到可管理的伺服器</h3>
+      <p>你需要擁有伺服器的「管理伺服器」權限才能設定 Bot</p>
+    </div>
+  {% endif %}
+
+</div>
+{% endblock %}

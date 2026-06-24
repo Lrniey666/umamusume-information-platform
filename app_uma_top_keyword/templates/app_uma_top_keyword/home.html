@@ -1,0 +1,142 @@
+{% extends 'base.html' %}
+
+{% block title %}賽馬娘資訊平台 - 各類別公告熱門關鍵詞{% endblock %}
+
+{% block content %}
+<div class="col-lg-12 mb-3">
+  <h2>各類別公告熱門關鍵詞</h2>
+  <p class="text-muted">依公告類別統計最常出現的關鍵詞，了解各類公告的核心內容。</p>
+</div>
+
+<!-- 查詢面板 -->
+<div class="col-lg-5 mb-4">
+  <div class="card">
+    <div class="card-header">
+      <h3 class="h6 text-uppercase mb-0">關鍵詞瀏覽與繪圖</h3>
+    </div>
+    <div class="card-body">
+      <div class="mb-3 row">
+        <label class="col-sm-3 form-label">公告類別</label>
+        <div class="col-md-9">
+          <select id="cate-selected" name="news_category" class="form-select">
+            <option>活動</option>
+            <option>卡池</option>
+            <option>競賽</option>
+            <option>系統</option>
+            <option>其他</option>
+          </select>
+          <div class="form-text">請選擇公告類別</div>
+        </div>
+      </div>
+      <div class="mb-3 row">
+        <label class="col-md-3 form-label">顯示幾個?</label>
+        <div class="col-md-9">
+          <input id="topk-selected" name="topk" value="10" class="form-control" />
+          <div class="form-text">預設值為 10，最多 30</div>
+        </div>
+      </div>
+      <div class="mb-3 row">
+        <div class="col-md-9 ms-auto">
+          <button type="button" id="btn-ok" class="btn btn-primary">查詢</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 圖表區 -->
+<div class="col-lg-7 mb-4">
+  <div class="card">
+    <div class="card-header">
+      <h3 class="h6 text-uppercase mb-0">熱門關鍵詞長條圖</h3>
+    </div>
+    <div class="card-body" id="chart-container" style="position:relative;">
+      <canvas id="mychart"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- 詞彙清單 -->
+<div class="col-lg-5 mb-5">
+  <div class="card">
+    <div class="card-header">
+      <h3 class="h6 text-uppercase mb-0">詞彙清單</h3>
+    </div>
+    <div class="card-body">
+      <ul id="topkeys" class="list-group list-group-flush"></ul>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.3/Chart.min.js"></script>
+<script>
+  const MAX_TOPK = 30;
+
+  call_ajax();
+
+  $('#cate-selected').on('change', function () { call_ajax(); });
+  $('#btn-ok').on('click', function () { call_ajax(); });
+
+  function call_ajax() {
+    let cate = $('#cate-selected').val();
+    let topk = Math.min(parseInt($('#topk-selected').val()) || 10, MAX_TOPK);
+    $('#topk-selected').val(topk);
+
+    $.ajax({
+      type: 'POST',
+      url: '/uma_top_keyword/api_get_cate_topword/',
+      data: { news_category: cate, topk: topk },
+      success: function (received) {
+        showTopKeys(received.wf_pairs);
+        showChart(received.chart_data);
+      }
+    });
+  }
+
+  function showTopKeys(items) {
+    $('#topkeys').empty();
+    for (let i = 0; i < items.length; i++) {
+      let word = items[i][0], freq = items[i][1];
+      $('#topkeys').append(
+        `<li class="list-group-item d-flex justify-content-between align-items-center">
+           ${word}
+           <span class="badge rounded-pill" style="background:var(--color-accent)">${freq}</span>
+         </li>`
+      );
+    }
+  }
+
+  function showChart(chart_data) {
+    let labels = chart_data.labels;
+    let values = chart_data.values;
+    let ctx = document.getElementById('mychart');
+    let container = document.getElementById('chart-container');
+
+    // 依資料筆數動態調整圖表高度，每列 44px，最小 200px
+    const chartHeight = Math.max(200, labels.length * 44);
+    container.style.height = chartHeight + 'px';
+
+    if (window.barchart) { barchart.destroy(); }
+
+    barchart = new Chart(ctx, {
+      type: 'horizontalBar',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: chart_data.category + ' 熱門關鍵詞',
+          data: values,
+          backgroundColor: 'rgba(124,58,237,0.55)',
+          borderColor: 'rgba(124,58,237,0.9)',
+          borderWidth: 1
+        }]
+      },
+      options: {
+        maintainAspectRatio: false,
+        scales: { xAxes: [{ ticks: { beginAtZero: true } }] }
+      }
+    });
+  }
+</script>
+{% endblock %}

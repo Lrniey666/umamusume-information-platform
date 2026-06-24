@@ -1,0 +1,143 @@
+{% extends "app_crawler_admin/base_admin.html" %}
+{% block title %}執行歷史{% endblock %}
+{% block nav_history %}active{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>執行歷史</h1>
+  <p class="page-subtitle">最近 50 次爬蟲執行記錄，可按來源與狀態篩選</p>
+</div>
+
+<!-- Filter row -->
+<div class="card" style="margin-bottom:16px;">
+  <div class="card-body" style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+    <div>
+      <label class="form-label">來源</label>
+      <select class="form-select form-select-sm" id="filterSource" style="width:140px;">
+        <option value="">全部來源</option>
+        {% for src in sources %}<option value="{{ src }}">{{ src }}</option>{% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="form-label">狀態</label>
+      <select class="form-select form-select-sm" id="filterStatus" style="width:120px;">
+        <option value="">全部</option>
+        <option value="success">success</option>
+        <option value="failed">failed</option>
+        <option value="running">running</option>
+        <option value="cancelled">cancelled</option>
+      </select>
+    </div>
+    <button class="btn btn-accent btn-sm" onclick="loadHistory()">篩選</button>
+    <button class="btn btn-outline-secondary btn-sm" onclick="clearFilter()">清除</button>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header-bar">
+    <h5>執行記錄</h5>
+    <span class="pill pill-gray" id="histCount">—</span>
+  </div>
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>來源</th><th>開始時間</th><th>結束時間</th><th>時長</th>
+          <th>狀態</th><th>新增</th><th>略過</th><th>錯誤</th><th>觸發</th><th>操作</th>
+        </tr>
+      </thead>
+      <tbody id="histBody">
+        <tr><td colspan="10" style="text-align:center;color:var(--muted)">載入中…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block modals %}
+<div class="modal fade" id="logModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="logModalTitle">Log 詳情</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="padding:0;">
+        <div class="log-panel" id="logModalBody" style="height:420px;border-radius:0;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function statusPill(s){
+  var m={'success':'pill-green','failed':'pill-red','cancelled':'pill-yellow','running':'pill-blue'};
+  return '<span class="pill '+(m[s]||'pill-gray')+'">'+s+'</span>';
+}
+
+function fmtDur(secs){
+  if(secs==null) return '—';
+  if(secs<60) return secs+'s';
+  return Math.floor(secs/60)+'m '+( secs%60 )+'s';
+}
+
+function loadHistory(){
+  var src = document.getElementById('filterSource').value;
+  var st  = document.getElementById('filterStatus').value;
+  var url = '/crawler-admin/api/history/?limit=50'
+           +(src?'&source='+src:'')+(st?'&status='+st:'');
+  $.get(url, function(d){
+    var rows=d.runs||[];
+    document.getElementById('histCount').textContent='共 '+rows.length+' 筆';
+    if(!rows.length){
+      document.getElementById('histBody').innerHTML='<tr><td colspan="10" style="text-align:center;color:var(--muted)">無符合記錄</td></tr>';
+      return;
+    }
+    var html=rows.map(function(r){
+      return '<tr>'
+        +'<td><code>'+r.source+'</code></td>'
+        +'<td>'+r.started_at+'</td>'
+        +'<td>'+(r.ended_at||'—')+'</td>'
+        +'<td>'+fmtDur(r.duration_s)+'</td>'
+        +statusPill(r.status)
+        +'<td style="color:var(--positive);font-weight:600">'+r.articles_new+'</td>'
+        +'<td>'+r.articles_skip+'</td>'
+        +'<td style="color:var(--negative)">'+r.articles_err+'</td>'
+        +'<td><span class="pill '+(r.triggered_by==='schedule'?'pill-accent':'pill-gray')+'">'+r.triggered_by+'</span></td>'
+        +'<td><button class="btn btn-outline-secondary btn-sm" onclick="showLog(\''+r.run_id+'\',\''+r.source+' '+r.started_at+'\')">Log</button></td>'
+        +'</tr>';
+    }).join('');
+    document.getElementById('histBody').innerHTML=html;
+  });
+}
+
+function clearFilter(){
+  document.getElementById('filterSource').value='';
+  document.getElementById('filterStatus').value='';
+  loadHistory();
+}
+
+function showLog(runId, title){
+  document.getElementById('logModalTitle').textContent='Log · '+title;
+  var body=document.getElementById('logModalBody');
+  body.innerHTML='<div class="dim" style="padding:12px;">載入中…</div>';
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('logModal')).show();
+  $.get('/crawler-admin/api/history/'+runId+'/', function(d){
+    var lines=(d.log_text||'（無 log 記錄）').split('\n');
+    body.innerHTML=lines.map(function(l){
+      var cls='dim';
+      if(/錯誤|error|exception|failed/i.test(l)) cls='err';
+      else if(/警告|warn/i.test(l)) cls='warn';
+      else if(/新增|已儲存|saved/i.test(l)) cls='ok';
+      else if(/啟動|初始化|start/i.test(l)) cls='info';
+      return '<div class="'+cls+'">'+l+'</div>';
+    }).join('');
+  });
+}
+
+loadHistory();
+</script>
+{% endblock %}

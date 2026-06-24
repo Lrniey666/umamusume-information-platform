@@ -1,0 +1,304 @@
+{% extends 'base.html' %} {% block title %} 陳時中聲量觀察 {% endblock %}
+{%block content %}
+<div class="col-lg-12">
+  <h1>陳時中聲量觀察</h1>
+  <p>針對一個你關心的人、事、物做深入的分析</p>
+</div>
+
+<!-- 顯示區塊-->
+<div class="col-lg-6 mb-3">
+  <div class="card">
+    <div class="card-header">
+      <h3 class="h6 text-uppercase mb-0">資料週期:資料截止時間的前4周</h3>
+    </div>
+    <div class="card-body">
+      <div class="row">
+        <!-- Leaderboard Container -->
+        <div class="container-fluid">
+          <!-- Leaderboard Heading -->
+          <h3>網路聲量</h3>
+          <p>
+            網路聲量(Voice of share)是什麼？
+            新聞報導有多少篇新聞提及這組關鍵字，聲量越高表示能見度越高。
+          </p>
+          <p>總篇數:有多少篇新聞提到; 總次數:在相關新聞中被提到多少次</p>
+
+          <hr />
+          <!-- Leaderboard Content -->
+          <div id="share_of_voice"></div>
+        </div>
+        <!-- /.container -->
+      </div>
+    </div>
+  </div>
+</div>
+<!-- 區塊結束-->
+
+<!-- 繪圖區塊-->
+<div class="col-lg-6 mb-3">
+  <div class="card">
+    <div class="card-header">
+      <h3 class="h6 text-uppercase mb-0">聲量分布情況</h3>
+    </div>
+    <div class="card-body">
+      <!-- description -->
+      <h3>依據新聞類別統計網路聲量</h3>
+      <p>在哪一類別的新聞中被報導最多篇?</p>
+      <hr />
+      <canvas id="bar_chart"></canvas>
+    </div>
+  </div>
+</div>
+<!-- 區塊結束-->
+
+<!-- 顯示區塊-->
+<div class="col-lg-6 mb-3">
+  <div class="card">
+    <div class="card-header">
+      <h3 class="h6 text-uppercase mb-0">聲量變化</h3>
+    </div>
+    <div class="card-body">
+      <!-- description -->
+      <h3>依據時間顯示聲量的變化</h3>
+      <p>在哪個時間點被新聞報導最多?</p>
+      <hr />
+      <canvas id="line_chart"></canvas>
+    </div>
+  </div>
+</div>
+<!-- 區塊結束-->
+
+<!-- 使用Django Template語法 -->
+<div class="col-lg-6 mb-3">
+  <div class="card">
+    <div class="card-header">
+      <h3 class="h6 text-uppercase mb-0">
+        聲量分布情況(使用Django Template語法)
+      </h3>
+    </div>
+    <div class="card-body">
+      <!-- description -->
+      <h3>依據新聞類別統計網路聲量</h3>
+      <p>在哪一類別的新聞中被報導最多篇?</p>
+      <p>使用Django Template語法</p>
+
+      <hr />
+      <div class="table-responsive">
+        <table class="table table-striped">
+          <thead>
+            <tr>
+              <th>新聞類別</th>
+              <th>聲量(篇數)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% if article_count_for_django %}
+            <!-- 使用Django Template語法:for迴圈，將資料一筆一筆印出來 -->
+            {% for category, count in article_count_for_django %}
+            <tr>
+              <td>{{ category }}</td>
+              <td>{{ count }}</td>
+            </tr>
+            {% endfor %} {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- 區塊結束-->
+
+{% endblock %} {% block extra_js %}
+<!-- jQuery指令用到的js-->
+<!-- 繪製line chart會用到，必須在chartjs之前先載入 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.13.0/moment.min.js"></script>
+<!-- chartjs圖js-->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.3/Chart.min.js"></script>
+<!-- 程式碼區 -->
+<script>
+  // How does JavaScript read data from Django server
+  // (1)使用Ajax與後端要資料
+  // (2)讀取Django後端(render之後)送過來的資料 變數名稱寫在兩個大括弧中間即可
+  // 加上 safe 是不讓Django做一些特殊符號的代號轉換(XSS安全機制)，否則我們拿到的資料顯示會有錯誤
+
+
+  call_ajax();
+  console.log("這行會在call_ajax()之後執行，因為call_ajax()是非同步的");
+
+  function call_ajax() {
+      $.ajax({
+        type: "POST",
+        url: "api_chen_shih_chung/", //It's good to use relative path
+        // url: "/scchen/api_chen_shih_chung/", //Use full path (Not recommend)
+
+        data: {}, // pass to server
+        success: function (received) {
+          //console.log(received);
+          //display data and show chart
+          // for share of voice
+          displayShareOfVoice(received.vos_summary.num_occurrence, received.vos_summary.num_frequency, received.vos_summary.photo_url);
+          // for bar chart
+          drawBarChart(received.vos_article_count_by_category.article_count, received.vos_article_count_by_category.category);
+          // for line chart
+          showLineChart(received.vos_frequency_date_based);
+        }
+      });
+  }
+
+
+
+
+  // *****************
+  // Function for displaying the share of voice
+  function displayShareOfVoice(num_occurrence, num_frequency, photo_url) {
+    // define a html block 一個區塊
+
+    let html_snippet = `
+          <div class="row">
+              <div class="col-md-4">
+                  <a href="#">
+                      <img class="img-fluid rounded mb-3 mb-md-0" src=${photo_url} alt="陳時中照片">
+                  </a>
+              </div>
+              <div class="col-md-8">
+                  <h1>總篇數:${num_occurrence}篇</h1>
+                  <h1>總次數:${num_frequency}次</h1>
+              </div>
+          </div>
+          <hr>`;
+
+
+    const new_div = document.createElement("div");
+    new_div.innerHTML += html_snippet;
+    document.getElementById("share_of_voice").appendChild(new_div);
+  }
+
+  // *****************
+  // Chart.defaults.global.defaultFontSize = 15;
+  // 繪製長條圖的函數
+  function drawBarChart(article_count, news_categories) {
+    //console.log(freq_values);
+
+    // data for chart
+    let data = {
+      labels: news_categories, //x axis 橫坐標軸
+      datasets: [
+        {
+          label: "陳時中聲量",//chart標題
+          data: article_count, //縱軸數值
+          backgroundColor: randomColors(article_count.length),
+          borderColor: randomColors(article_count.length),
+          borderWidth: 1,
+        },
+      ],
+    };
+    // options for chart,  y axis value begins at zero
+    let options = {
+      scales: {
+        yAxes: [
+          {
+            ticks: {
+              beginAtZero: true, //從0開始
+              responsive: true //符合響應式
+            },
+          },
+        ],
+      },
+    };
+
+    // get chart id from html
+    const barChartElem = document.getElementById("bar_chart");
+    // new a bar chart
+    new Chart(barChartElem, {
+      type: "bar",
+      data: data,
+      options: options,
+    });
+  }
+
+  // *****************
+  // Line chart
+  function showLineChart(frequency_date_based) {
+    const lineChartElem = document
+      .getElementById("line_chart")
+      .getContext("2d");
+
+      const freq_values = frequency_date_based;
+
+    const myoptions = {
+      type: "line",
+      data: {
+        datasets: [
+          {
+            label: "s2",
+            borderColor: randomColors(1),
+            backgroundColor: randomColors(1),
+            borderWidth: 2,
+            data: freq_values,
+          },
+        ],
+      },
+      options: {
+        legend: {
+          display: false,
+        },
+        scales: {
+          xAxes: [
+            {
+              type: "time",
+              time: {
+                unit: "day",
+                displayFormats: {
+                  //day: 'DD-MM-YYYY'
+                  day: "MM/DD",
+                },
+              },
+            },
+          ],
+          yAxes: [
+            {
+              ticks: {
+                beginAtZero: true, //從0開始
+                responsive: true, //符合響應式
+              },
+              display: true,
+              scaleLabel: {
+                display: true,
+                labelString: "出現次數",
+              },
+            },
+          ],
+        },
+      },
+    };
+
+    // 檢查line_chart變數是否存在，如果存在，表示已經有之前畫的圖，必須要先清除之後，再畫新的圖。否則會有新舊圖重疊現象
+    //用以下這種方式檢查與清除舊圖。window指的是這個頁面，這個頁面有很多變數存在，檢查line_chart是否存在，若有存在，必須要先清除之後，再畫新的圖。否則會有新舊圖重疊現象
+    if (window.time_line_chart) {
+      time_line_chart.destroy();
+    }
+
+    // 畫一張新圖(產生一個圖物件變數名稱為line_chart)
+    // 必須全域變數--注意:前面不要有let, var, const等修飾詞
+    // 理由: 我們要讓它存在於網頁全域變數，
+    // 這樣我們才方便判斷是否有前一次的圖，如果存在有，要刪除之，否則，很多張圖會疊在一起
+    time_line_chart = new Chart(lineChartElem, myoptions);
+  }
+
+  // randomize color
+  function randomColors(length) {
+    var pool = [];
+    for (let i = 0; i < length; i++) {
+      pool.push(dynamicColors());
+    }
+    return pool;
+  }
+
+  function dynamicColors() {
+    var r = Math.floor(Math.random() * 255);
+    var g = Math.floor(Math.random() * 255);
+    var b = Math.floor(Math.random() * 255);
+    return "rgba(" + r + "," + g + "," + b + ", 0.3)";
+  }
+</script>
+{% endblock %}

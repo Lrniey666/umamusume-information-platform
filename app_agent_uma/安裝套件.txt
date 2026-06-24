@@ -1,0 +1,21 @@
+
+conda activate ai25
+
+pip install google-genai
+pip install -U google-genai
+pip install openai
+
+
+pip install langchain-google-genai
+pip install langgraph
+pip install langchain
+
+pip install tavily-python
+
+pip install faiss-cpu
+
+pip install pypdf
+
+pip install dotenv
+# pip install python-dotenv
+

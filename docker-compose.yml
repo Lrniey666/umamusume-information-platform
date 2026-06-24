@@ -1,0 +1,81 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: postgres-poa
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-umamusume}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - pgdata_poa:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-umamusume}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  web-poa:
+    build:
+      context: .
+      dockerfile: ./docker-files-poa/Dockerfile
+    container_name: web-poa
+    environment:
+      DJANGO_DB_ENGINE: postgres
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB:-umamusume}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - .:/app
+      - static_volume_poa:/app/staticfiles
+      - media_volume_poa:/app/media
+    expose:
+      - 8000
+    env_file: ./.env
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  nginx:
+    build:
+      context: ./nginx
+    container_name: nginx-poa
+    volumes:
+      - static_volume_poa:/app/staticfiles
+      - media_volume_poa:/app/media
+    ports:
+      - "80:80"
+    depends_on:
+      - web-poa
+    restart: unless-stopped
+
+  discord-bot:
+    build:
+      context: .
+      dockerfile: ./docker-files-poa/Dockerfile
+    command: python manage.py run_discord_bot
+    environment:
+      DJANGO_DB_ENGINE: postgres
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB:-umamusume}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    env_file: ./.env
+    volumes:
+      - .:/app
+      - media_volume_poa:/app/media
+    depends_on:
+      db:
+        condition: service_healthy
+      web-poa:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  static_volume_poa:
+  media_volume_poa:
+  pgdata_poa:

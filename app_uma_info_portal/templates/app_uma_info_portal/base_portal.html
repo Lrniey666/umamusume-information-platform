@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+{% load static %}
+<html lang="zh-TW">
+<head>
+  <title>{% block title %}UMA Info — 賽馬娘 Discord Bot{% endblock %}</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="UMA Info — 賽馬娘情報 Discord Bot：每日情報推播、AI 智能問答、彈性頻道管理" />
+
+  <!-- 主題偵測（與主站共用 uma-theme key）-->
+  <script>
+    (function(){
+      var m = localStorage.getItem('uma-theme') || 'system';
+      var dark = m==='dark' || (m==='system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme-mode', m);
+    })();
+  </script>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="{% static 'css/design-system.css' %}" rel="stylesheet" />
+
+  <style>
+    /* ── Portal 專屬樣式 ─────────────────────────────────── */
+    body.portal-shell {
+      min-height: 100vh;
+      background: var(--color-bg-base);
+      color: var(--color-text-primary);
+    }
+
+    /* Portal 頂部導覽 */
+    .portal-nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 1000;
+      background: var(--color-navbar-bg);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--color-border);
+      height: 60px;
+      display: flex;
+      align-items: center;
+      padding: 0 24px;
+    }
+    .portal-nav .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 800;
+      font-size: 1.15rem;
+      color: var(--color-text-primary);
+      text-decoration: none;
+      letter-spacing: -0.01em;
+    }
+    .portal-nav .brand-icon {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, var(--color-accent), #5865F2);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: .95rem;
+      font-weight: 800;
+      color: #fff;
+      flex-shrink: 0;
+      letter-spacing: -.02em;
+    }
+    .portal-nav .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-left: 24px;
+    }
+    .portal-nav .nav-links a {
+      padding: 6px 14px;
+      border-radius: var(--radius-pill);
+      color: var(--color-text-secondary);
+      text-decoration: none;
+      font-size: 0.9rem;
+      transition: color 0.2s, background 0.2s;
+    }
+    .portal-nav .nav-links a:hover {
+      color: var(--color-text-primary);
+      background: var(--color-accent-soft);
+    }
+    .portal-nav .nav-right {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .portal-nav .user-chip {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 14px 4px 4px;
+      border-radius: var(--radius-pill);
+      background: var(--color-bg-elevated);
+      border: 1px solid var(--color-border);
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--color-text-primary);
+      text-decoration: none;
+      transition: border-color 0.2s;
+    }
+    .portal-nav .user-chip:hover {
+      border-color: var(--color-accent);
+    }
+    .portal-nav .user-chip img {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+    .portal-nav .btn-discord-login {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 18px;
+      background: #5865F2;
+      color: #fff;
+      border-radius: var(--radius-pill);
+      font-size: 0.875rem;
+      font-weight: 700;
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.15s;
+    }
+    .portal-nav .btn-discord-login:hover { opacity: 0.9; transform: translateY(-1px); }
+
+    /* 主題切換按鈕 */
+    .portal-nav .theme-btn {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      border: 1px solid var(--color-border);
+      background: transparent;
+      color: var(--color-text-secondary);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.9rem;
+      transition: background 0.2s, color 0.2s;
+    }
+    .portal-nav .theme-btn:hover {
+      background: var(--color-accent-soft);
+      color: var(--color-accent);
+    }
+
+    /* Portal 主內容區（需留 nav 高度）*/
+    .portal-content {
+      padding-top: 60px;
+    }
+
+    /* Portal 通用卡片 */
+    .portal-card {
+      background: var(--color-bg-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+
+    /* Discord 品牌色 Badge */
+    .badge-discord {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 14px;
+      border-radius: var(--radius-pill);
+      background: rgba(88, 101, 242, 0.15);
+      border: 1px solid rgba(88, 101, 242, 0.35);
+      color: #5865F2;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+    [data-theme="dark"] .badge-discord {
+      background: rgba(88, 101, 242, 0.2);
+      color: #8b9bff;
+    }
+
+    /* 頁腳 */
+    .portal-footer {
+      padding: 32px 24px;
+      border-top: 1px solid var(--color-border);
+      background: var(--color-bg-elevated);
+      text-align: center;
+      color: var(--color-text-secondary);
+      font-size: 0.85rem;
+    }
+    .portal-footer a {
+      color: var(--color-text-secondary);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    .portal-footer a:hover { color: var(--color-accent); }
+  </style>
+
+  {% block extra_css %}{% endblock %}
+</head>
+<body class="ui-modern portal-shell">
+  <div class="mesh-bg" aria-hidden="true"></div>
+
+  <!-- 頂部導覽列 -->
+  <nav class="portal-nav">
+    <a class="brand" href="{% url 'app_uma_info_portal:home' %}">
+      <span class="brand-icon" aria-hidden="true">U</span>
+      UMA Info
+    </a>
+    <div class="nav-links d-none d-md-flex">
+      <a href="{% url 'app_uma_info_portal:home' %}#features">功能介紹</a>
+      <a href="/">回主站</a>
+    </div>
+    <div class="nav-right">
+      <!-- 主題切換 -->
+      <button class="theme-btn" id="portalThemeBtn" title="切換主題" aria-label="切換主題">
+        <span id="portalThemeIcon">🌙</span>
+      </button>
+
+      {% if user %}
+        <!-- 已登入：顯示頭像 + 用戶名 -->
+        <a class="user-chip" href="{% url 'app_uma_info_portal:servers' %}">
+          {% if user.avatar_hash %}
+            <img src="{{ user.avatar_url }}" alt="{{ user.username }}頭像" />
+          {% else %}
+            <span style="width:28px;height:28px;border-radius:50%;background:var(--color-accent-soft);display:flex;align-items:center;justify-content:center;font-size:.75rem;">👤</span>
+          {% endif %}
+          {{ user.username }}
+        </a>
+        <a class="btn-discord-login" href="{% url 'app_uma_info_portal:auth_logout' %}"
+           style="background:var(--color-bg-elevated);color:var(--color-text-secondary);border:1px solid var(--color-border);">
+          登出
+        </a>
+      {% else %}
+        <a class="btn-discord-login" href="{% url 'app_uma_info_portal:auth_login' %}">
+          <svg width="16" height="12" viewBox="0 0 71 55" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><g clip-path="url(#clip0)"><path d="M60.1045 4.8978C55.5792 2.8214 50.7265 1.2916 45.6527 0.41542C45.5603 0.39851 45.468 0.440769 45.4204 0.525289C44.7963 1.6353 44.105 3.0834 43.6209 4.2216C38.1637 3.4046 32.7345 3.4046 27.3892 4.2216C26.905 3.0581 26.1886 1.6353 25.5617 0.525289C25.5141 0.443589 25.4218 0.40133 25.3294 0.41542C20.2584 1.2888 15.4057 2.8186 10.8776 4.8978C10.8384 4.9147 10.8048 4.9429 10.7825 4.9795C1.57795 18.7309 -0.943561 32.1443 0.293408 45.3914C0.299005 45.4562 0.335386 45.5182 0.385761 45.5576C6.45866 50.0174 12.3413 52.7249 18.1147 54.5195C18.2071 54.5477 18.305 54.5139 18.3638 54.4378C19.7295 52.5728 20.9469 50.6063 21.9907 48.5383C22.0523 48.4172 21.9935 48.2735 21.8676 48.2256C19.9366 47.4931 18.0979 46.6 16.3292 45.5858C16.1893 45.5041 16.1781 45.304 16.3068 45.2082C16.679 44.9293 17.0513 44.6391 17.4067 44.3461C17.471 44.2926 17.5606 44.2813 17.6362 44.3151C29.2558 49.6202 41.8354 49.6202 53.3179 44.3151C53.3935 44.2785 53.4831 44.2898 53.5502 44.3433C53.9057 44.6363 54.2779 44.9293 54.6529 45.2082C54.7816 45.304 54.7732 45.5041 54.6333 45.5858C52.8646 46.6197 51.0259 47.4931 49.0921 48.2228C48.9662 48.2707 48.9102 48.4172 48.9718 48.5383C50.038 50.6034 51.2554 52.5699 52.5959 54.435C52.6519 54.5139 52.7526 54.5477 52.845 54.5195C58.6464 52.7249 64.529 50.0174 70.6019 45.5576C70.6551 45.5182 70.6887 45.459 70.6943 45.3942C72.1747 30.0791 68.2147 16.7757 60.1968 4.9823C60.1772 4.9429 60.1437 4.9147 60.1045 4.8978ZM23.7259 37.3253C20.2276 37.3253 17.3451 34.1136 17.3451 30.1693C17.3451 26.225 20.1717 23.0133 23.7259 23.0133C27.308 23.0133 30.1626 26.2532 30.1066 30.1693C30.1066 34.1136 27.28 37.3253 23.7259 37.3253ZM47.3178 37.3253C43.8196 37.3253 40.9371 34.1136 40.9371 30.1693C40.9371 26.225 43.7636 23.0133 47.3178 23.0133C50.9 23.0133 53.7545 26.2532 53.6986 30.1693C53.6986 34.1136 50.9 37.3253 47.3178 37.3253Z"/></g></svg>
+          以 Discord 登入
+        </a>
+      {% endif %}
+    </div>
+  </nav>
+
+  <!-- 主要內容 -->
+  <main class="portal-content">
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- 頁腳 -->
+  <footer class="portal-footer">
+    <div class="d-flex justify-content-center gap-4 mb-2 flex-wrap">
+      <a href="/">賽馬娘資訊平台</a>
+      <span>·</span>
+      <a href="{% url 'app_uma_info_portal:home' %}">UMA Info</a>
+      <span>·</span>
+      <a href="/crawler-admin/discord/">控制台</a>
+    </div>
+    <p class="mb-0" style="font-size:.8rem;opacity:.6;">
+      © 2026 賽馬娘資訊平台 — UMA Info Bot | 本站不隸屬 Cygames 或 Nintendo
+    </p>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // 主題切換（與主站邏輯一致）
+    (function(){
+      var btn  = document.getElementById('portalThemeBtn');
+      var icon = document.getElementById('portalThemeIcon');
+      function refreshIcon(){
+        var mode = localStorage.getItem('uma-theme') || 'system';
+        icon.textContent = mode==='dark' ? '☀️' : mode==='light' ? '🌙' : '💻';
+      }
+      refreshIcon();
+      if(btn){ btn.addEventListener('click', function(){
+        var modes = ['system','dark','light'];
+        var cur   = localStorage.getItem('uma-theme') || 'system';
+        var next  = modes[(modes.indexOf(cur)+1) % modes.length];
+        localStorage.setItem('uma-theme', next);
+        var dark = next==='dark' || (next==='system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme-mode', next);
+        refreshIcon();
+      });}
+    })();
+  </script>
+  {% block extra_js %}{% endblock %}
+</body>
+</html>

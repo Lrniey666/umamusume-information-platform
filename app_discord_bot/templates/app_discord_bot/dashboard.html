@@ -1,0 +1,310 @@
+{% extends "base.html" %}
+{% block title %}Discord Bot 狀態儀表板{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="row">
+    <div class="col-lg-10 mx-auto">
+
+      <div class="card mb-4 border-0" style="background:linear-gradient(135deg,#1a1035,#0d1b2a);">
+        <div class="card-body p-4">
+          <h2 class="mb-1 fw-bold text-white">🤖 Discord Bot 狀態儀表板</h2>
+          <p class="text-light mb-2 opacity-75">D1–D8 馬娘情報站 Discord Bot 系統</p>
+          <div class="d-flex gap-2 flex-wrap">
+            <span class="badge" style="background:#5865F2!important;color:#fff">discord.py 2.4</span>
+            <span class="badge" style="background:#5865F2!important;color:#fff">APScheduler</span>
+            <span class="badge" style="background:#5865F2!important;color:#fff">雙層主題篩選</span>
+            <span class="badge" style="background:#5865F2!important;color:#fff">AI 新聞生成</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 統計卡片 -->
+      <div class="row g-3 mb-4">
+        <div class="col-md-3">
+          <div class="card text-center border-0">
+            <div class="card-body py-4">
+              <div style="font-size:2rem;font-weight:800;color:#5865F2;">{{ total_messages }}</div>
+              <div class="text-muted mt-1">總訊息數</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card text-center border-0">
+            <div class="card-body py-4">
+              <div style="font-size:2rem;font-weight:800;color:#23a55a;">{{ umamusume_count }}</div>
+              <div class="text-muted mt-1">馬娘相關訊息</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card text-center border-0">
+            <div class="card-body py-4">
+              <div style="font-size:2rem;font-weight:800;color:#f0b232;">{{ unclassified_count }}</div>
+              <div class="text-muted mt-1">待分類訊息</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card text-center border-0">
+            <div class="card-body py-4">
+              <div style="font-size:2rem;font-weight:800;color:#eb459e;" id="active-count">{{ configs.count }}</div>
+              <div class="text-muted mt-1">頻道設定數</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 頻道設定管理 -->
+      <div class="card border-0 mb-4">
+        <div class="card-header d-flex align-items-center justify-content-between fw-bold">
+          <span>⚙️ 頻道設定管理</span>
+          <button class="btn btn-sm" style="background:#5865F2;color:#fff;" data-bs-toggle="collapse" data-bs-target="#addChannelForm">
+            + 新增頻道
+          </button>
+        </div>
+
+        <!-- 新增頻道表單 -->
+        <div class="collapse" id="addChannelForm">
+          <div class="card-body border-bottom" style="background:var(--color-bg-elevated);">
+            <form id="form-add-channel" class="row g-2 align-items-end">
+              {% csrf_token %}
+              <div class="col-md-3">
+                <label class="form-label mb-1 small fw-bold">頻道 ID <span class="text-danger">*</span></label>
+                <input type="text" id="in-channel-id" class="form-control form-control-sm" placeholder="例：1175824514525962322" pattern="\d+" required>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label mb-1 small fw-bold">名稱 <span class="text-danger">*</span></label>
+                <input type="text" id="in-channel-name" class="form-control form-control-sm" placeholder="例：馬娘討論版" required>
+              </div>
+              <div class="col-md-2">
+                <label class="form-label mb-1 small fw-bold">類型 <span class="text-danger">*</span></label>
+                <select id="in-channel-type" class="form-select form-select-sm">
+                  <option value="crawl">爬取頻道</option>
+                  <option value="news">推播頻道</option>
+                </select>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label mb-1 small fw-bold">備注</label>
+                <input type="text" id="in-channel-note" class="form-control form-control-sm" placeholder="選填">
+              </div>
+              <div class="col-md-1">
+                <button type="submit" class="btn btn-sm btn-success w-100">儲存</button>
+              </div>
+            </form>
+            <div id="add-channel-msg" class="mt-2 small"></div>
+          </div>
+        </div>
+
+        <!-- 頻道列表 -->
+        <div class="card-body p-0">
+          {% if configs %}
+          <table class="table table-hover mb-0 align-middle" id="channel-table">
+            <thead class="table-light">
+              <tr>
+                <th class="ps-3">名稱</th>
+                <th>頻道 ID</th>
+                <th>類型</th>
+                <th>狀態</th>
+                <th class="text-end pe-3">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for cfg in configs %}
+              <tr id="row-{{ cfg.pk }}">
+                <td class="ps-3">{{ cfg.name }}</td>
+                <td><code>{{ cfg.channel_id }}</code></td>
+                <td>
+                  {% if cfg.channel_type == 'crawl' %}
+                    <span class="badge" style="background:#5865F2;">爬取</span>
+                  {% else %}
+                    <span class="badge bg-success">推播</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <span class="badge {% if cfg.is_active %}bg-success{% else %}bg-secondary{% endif %} status-badge" id="status-{{ cfg.pk }}">
+                    {% if cfg.is_active %}啟用{% else %}停用{% endif %}
+                  </span>
+                </td>
+                <td class="text-end pe-3">
+                  <button class="btn btn-xs btn-outline-secondary btn-sm me-1"
+                          onclick="toggleChannel({{ cfg.pk }}, this)">切換</button>
+                  <button class="btn btn-xs btn-outline-danger btn-sm"
+                          onclick="deleteChannel({{ cfg.pk }})">刪除</button>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <div class="text-center py-4 text-muted" id="no-config-hint">
+            <p class="mb-2">尚無頻道設定</p>
+            <small>點擊右上角「+ 新增頻道」，或在 Discord 使用 <code>!channel set crawl</code> 指令設定</small>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="row g-3">
+        <!-- 最近推播紀錄 -->
+        <div class="col-md-7">
+          <div class="card border-0">
+            <div class="card-header fw-bold">📨 最近推播紀錄</div>
+            <div class="card-body p-0">
+              {% if recent_logs %}
+              <table class="table table-hover mb-0">
+                <thead><tr><th>時間</th><th>模型</th><th>狀態</th></tr></thead>
+                <tbody>
+                  {% for log in recent_logs %}
+                  <tr>
+                    <td style="font-size:12px;">{{ log.created_at|date:"m/d H:i" }}</td>
+                    <td><small>{{ log.model_used }}</small></td>
+                    <td>
+                      <span class="badge {% if log.status == 'sent' %}bg-success{% elif log.status == 'failed' %}bg-danger{% else %}bg-secondary{% endif %}">
+                        {{ log.status }}
+                      </span>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+              {% else %}
+              <div class="text-center py-4 text-muted">尚無推播紀錄</div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
+        <!-- Discord 指令說明 -->
+        <div class="col-md-5">
+          <div class="card border-0 h-100">
+            <div class="card-header fw-bold">💬 Discord Bot 指令</div>
+            <div class="card-body" style="font-size:13px;">
+              <p class="text-muted mb-2">在任意 Discord 頻道輸入以下指令：</p>
+              <table class="table table-sm table-borderless mb-0">
+                <tbody>
+                  <tr>
+                    <td><code>!channel help</code></td>
+                    <td>顯示所有指令說明</td>
+                  </tr>
+                  <tr>
+                    <td><code>!channel set crawl</code></td>
+                    <td>設為爬取頻道</td>
+                  </tr>
+                  <tr>
+                    <td><code>!channel set news</code></td>
+                    <td>設為推播頻道</td>
+                  </tr>
+                  <tr>
+                    <td><code>!channel list</code></td>
+                    <td>列出所有設定</td>
+                  </tr>
+                  <tr>
+                    <td><code>!channel remove</code></td>
+                    <td>移除當前頻道</td>
+                  </tr>
+                </tbody>
+              </table>
+              <hr class="my-2">
+              <small class="text-muted">名稱可選填：<br><code>!channel set news 每日新聞版</code></small>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 啟動方式 -->
+      <div class="card mt-4 border-0">
+        <div class="card-header fw-bold">🚀 啟動方式</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <h6 class="text-muted">本地啟動</h6>
+              <pre class="rounded p-3" style="background:#1a1720;color:#e2e8f0;font-size:12px;">python manage.py run_discord_bot</pre>
+            </div>
+            <div class="col-md-6">
+              <h6 class="text-muted">Docker 啟動</h6>
+              <pre class="rounded p-3" style="background:#1a1720;color:#e2e8f0;font-size:12px;">docker compose up discord-bot</pre>
+            </div>
+          </div>
+          <div class="alert alert-info mt-3 mb-0" style="font-size:13px;">
+            <strong>必要環境變數：</strong>
+            <code>DISCORD_BOT_TOKEN</code>
+            — 頻道設定請透過此頁面或 Discord 指令管理，無需在 <code>.env</code> 設定頻道 ID。
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+const CSRF = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+
+async function postJSON(url, data) {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+// 新增頻道
+document.getElementById('form-add-channel').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const msgEl = document.getElementById('add-channel-msg');
+  msgEl.textContent = '';
+  const payload = {
+    channel_id: document.getElementById('in-channel-id').value.trim(),
+    name: document.getElementById('in-channel-name').value.trim(),
+    channel_type: document.getElementById('in-channel-type').value,
+    note: document.getElementById('in-channel-note').value.trim(),
+  };
+  try {
+    const data = await postJSON("{% url 'app_discord_bot:api_channel_add' %}", payload);
+    msgEl.innerHTML = `<span class="text-success">✅ ${data.status === 'created' ? '新增成功' : '更新成功'}：${data.name}（${data.channel_id}）</span>`;
+    // 重新整理頁面以更新列表
+    setTimeout(() => location.reload(), 800);
+  } catch (err) {
+    msgEl.innerHTML = `<span class="text-danger">❌ ${err.message}</span>`;
+  }
+});
+
+// 刪除頻道
+async function deleteChannel(pk) {
+  if (!confirm('確定要刪除此頻道設定？')) return;
+  try {
+    await postJSON(`/discord-bot/api/channels/${pk}/delete/`, {});
+    const row = document.getElementById(`row-${pk}`);
+    if (row) row.remove();
+    updateCount(-1);
+  } catch (err) {
+    alert('刪除失敗：' + err.message);
+  }
+}
+
+// 切換啟用狀態
+async function toggleChannel(pk, btn) {
+  try {
+    const data = await postJSON(`/discord-bot/api/channels/${pk}/toggle/`, {});
+    const badge = document.getElementById(`status-${pk}`);
+    if (badge) {
+      badge.textContent = data.is_active ? '啟用' : '停用';
+      badge.className = `badge status-badge ${data.is_active ? 'bg-success' : 'bg-secondary'}`;
+    }
+  } catch (err) {
+    alert('操作失敗：' + err.message);
+  }
+}
+
+function updateCount(delta) {
+  const el = document.getElementById('active-count');
+  if (el) el.textContent = parseInt(el.textContent || '0') + delta;
+}
+</script>
+{% endblock %}

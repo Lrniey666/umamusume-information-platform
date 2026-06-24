@@ -1,0 +1,178 @@
+{% extends 'base.html' %}
+
+{% block extra_css %}
+<style>
+    .markdown-body {
+        box-sizing: border-box;
+        min-width: 200px;
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 45px;
+    }
+
+    .markdown-body h1 { font-size: 2em; margin-bottom: 1rem; border-bottom: 1px solid #eaecef; padding-bottom: .3em; }
+    .markdown-body h2 { font-size: 1.5em; margin-top: 1.5rem; margin-bottom: 1rem; border-bottom: 1px solid #eaecef; padding-bottom: .3em; }
+    .markdown-body h3 { font-size: 1.25em; margin-top: 1.5rem; margin-bottom: 1rem; }
+    .markdown-body pre { background-color: #f6f8fa; padding: 16px; overflow: auto; border-radius: 3px; }
+    .markdown-body code { background-color: rgba(27,31,35,.05); padding: .2em .4em; border-radius: 3px; font-size: 85%; }
+    .markdown-body pre code { background-color: transparent; padding: 0; }
+    .markdown-body ul, .markdown-body ol { padding-left: 2em; margin-bottom: 1rem; }
+    .markdown-body p { margin-bottom: 1rem; }
+    
+    .nav-pills .nav-link.active, .nav-pills .show>.nav-link {
+        background-color: #0d6efd;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="mb-4">POA 智能代理 - 各階段設計說明</h1>
+            
+            <!-- 三階段總覽介紹 -->
+            <div class="card mb-4 shadow-sm border-primary">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0 fs-5">🌟 POA Agent 演進總覽</h4>
+                </div>
+                <div class="card-body bg-light">
+                    <h5 class="text-primary mt-2">1. 這三個階段分別在做什麼？</h5>
+                    <ul>
+                        <li><strong>第一階段 (原生 SDK)：</strong>直接使用模型原廠 (Gemini) 提供的 SDK，將分析函數設定為「工具」，讓 LLM 進行基礎的 Function Calling（工具自動調用）來回答問題。</li>
+                        <li><strong>第二階段 (LangChain)：</strong>導入高階 AI 開發框架 LangChain，使用原廠包裝好的 <code>create_react_agent</code>，並加入「短期記憶 (Session Context)」，讓 Agent 擁有連續對話的能力。</li>
+                        <li><strong>第三階段 (Custom Graph)：</strong>放棄框架預先寫好的黑箱 Agent，改用 <strong>LangGraph</strong> 狀態圖框架，將系統的「思考」、「推理」、「呼叫工具」、「回應」拆解成可完全客製化的「節點 (Nodes)」，親手打造符合特定商業邏輯的流程。</li>
+                    </ul>
+
+                    <h5 class="text-primary mt-4">2. 為什麼需要這三個階段？</h5>
+                    <p class="mb-2">這是一個<strong>漸進式的 Agent 學習與演進歷程</strong>：</p>
+                    <ul>
+                        <li>如果一開始就使用最複雜的 LangGraph 開發，會很難釐清「模型本身的能力」與「框架賦予的能力」之間的邊界。</li>
+                        <li>先從第一階段了解 <strong>AI 如何理解並執行真實世界的程式碼 (Tool Use)</strong>；接著在第二階段學會 <strong>引入記憶與泛用型代理人標準架構</strong>；最後在第三階段，當標準架構無法達到複雜的企業級要求時，掌握 <strong>完全自定義控制權的圖結構心法</strong>。</li>
+                    </ul>
+
+                    <h5 class="text-primary mt-4">3. 這三個階段有何不同？（Agent 性質大解析）</h5>
+                    <div class="table-responsive mt-3">
+                        <table class="table table-bordered table-hover mb-0 bg-white">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width: 15%;">階段名</th>
+                                    <th>Agent 運作型態</th>
+                                    <th style="width: 12%;">對話記憶</th>
+                                    <th style="width: 35%;">開發者的控制力</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>第一階段</strong><br><small class="text-muted">原生 SDK</small></td>
+                                    <td><strong>「極簡直覺」</strong>：程式碼最少，執行速度最快。直接與模型對話，適合開發單一模型、功能簡單的快速原型。</td>
+                                    <td><span class="badge bg-secondary">無</span><br><small>單次視角</small></td>
+                                    <td><span class="text-danger fw-bold">最低</span>：完全依賴模型原廠 SDK 的自動化參數，難以跨模型（如換成 GPT-4）或加入複雜的邏輯攔截。</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>第二階段</strong><br><small class="text-muted">LangChain</small></td>
+                                    <td><strong>「生態系整合」</strong>：雖然程式碼較多，但具備跨模型能力與豐富的工具庫（如內建搜尋、PDF 讀取、向量資料庫串接）。</td>
+                                    <td><span class="badge bg-success">有</span><br><small>Session紀錄</small></td>
+                                    <td><span class="text-warning fw-bold">中等</span>：方便擴展。當需要串接「外部搜尋」或「多輪複雜記憶」時，框架提供的組件能省下大量手寫邏輯的時間。</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>第三階段</strong><br><small class="text-muted">Custom Graph</small></td>
+                                    <td><strong>「企業級工作流」</strong>：將 Agent 拆解為狀態機。適合需要「人類審核工具呼叫」或「循環修正錯誤」的工業級場景。</td>
+                                    <td><span class="badge bg-success">有</span><br><small>狀態圖傳遞</small></td>
+                                    <td><span class="text-success fw-bold">最高</span>：完全掌控對話的每一個節點。可以精確決定何時該停下來問人類、何時該存檔、何時該結束。</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- Agentic AI 核心概念解析 -->
+            <div class="card mt-5 shadow-sm border-info">
+                <div class="card-header bg-info text-white">
+                    <h4 class="mb-0 fs-5">🚀 當紅炸子雞：什麼是 Agentic AI？</h4>
+                </div>
+                <div class="card-body bg-light">
+                    <h5 class="text-info mt-2">什麼是 Agent AI（代理式人工智慧）？</h5>
+                    <p>傳統的 AI（如早期的 ChatGPT）主要是在做「文字生成」與「問答」，像是一個坐在房間裡查百科全書的顧問。而 <strong>Agentic AI</strong> 則是讓 AI 具備了<strong>「感知、思考、行動」</strong>（Perception, Thought, Action）的綜合能力。AI 不再只是吐出文字，而是懂得將複雜任務拆解、自主規劃，並呼叫外部程式碼去完成操作（例如：幫你查資料庫、發信、繪製圖表），如同一個能真正幫你「辦事」的代理人。</p>
+
+                    <h5 class="text-info mt-4 mb-3">🛠 技術名詞由淺入深解析</h5>
+                    <div class="table-responsive">
+                        <table class="table table-bordered bg-white">
+                            <tbody>
+                                <tr>
+                                    <th style="width: 20%;" class="table-light">1. Function (函式)</th>
+                                    <td>最基礎的程式碼單元（如 Python 中的 <code>def get_data()</code>）。它接收輸入、運算邏輯，然後產出回傳值。這是傳統程式開發的底層原子，本身沒有任何 AI 成分。</td>
+                                </tr>
+                                <tr>
+                                    <th class="table-light">2. Tools (工具)</th>
+                                    <td>當一般的 Function 被包裝起來，加上了給機器看的「清晰描述 (Docstring) 」與「明確型別 (Type Hint) 」，它就變成了 <strong>Tool</strong>。Tool 就是裝上了握把的 Function，讓 <strong>AI 模型能夠理解它的用途，並決定何時該呼叫它。</strong>（讓 AI 長出手腳）</td>
+                                </tr>
+                                <tr>
+                                    <th class="table-light">3. Skill (技能)</th>
+                                    <td>一組為了解決「特定商業場景」而組合起來的 <strong>Tools 與 System Prompts (系統指令) 的集合</strong>。例如：「輿情數據技能」包含了可以查詢關鍵字、查詢人物的工具，並且 AI 被賦予了如何交叉對比資料的指令。它代表著較高階的模組化能力。</td>
+                                </tr>
+                                <tr>
+                                    <th class="table-light">4. MCP (Model Context Protocol)</th>
+                                    <td><strong>模型上下文協定</strong>。這是一種近期的標準通訊介面（類似於 USB 的通用規格）。以往每個平台的工具寫法都不同，而 MCP 讓你可以寫一次 Tool，就能讓 OpenAI、Claude、Gemini 等不同的 AI 都可以「隨插即用」去安全地呼叫這些本地資源與工具。</td>
+                                </tr>
+                                <tr>
+                                    <th class="table-light">5. Agent (智能代理)</th>
+                                    <td>終極實體。結合了 <strong>LLM (大腦) + Tools/Skills (手腳) + Memory (記憶) + Planning (規劃能力)</strong>。Agent 碰到模糊的問題時，能自己決定：「我應該先用 Tool A 找數據，得到結果後用 Tool B 做處理，最後統整給你」。</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <h5 class="text-info mt-4">🔗 它們之間的關係？</h5>
+                    <p>開發者寫了底層的 Python <strong>Function</strong>，再把它們加上文件封裝成 <strong>Tools</strong>。接著將多個 Tools 與 Prompt 組合起來綁定成某一種領域的 <strong>Skill</strong>。為了讓各式各樣的 AI 模型都能一致且安全地取用這些本地端的 Skills/Tools，我們可能會透過 <strong>MCP</strong> 介面將其發佈出去。這一切準備就緒後，具有大腦思維能力的 <strong>Agent</strong> 在接到人類指令時，便能自主運用這些技能去達成最終目標。</p>
+
+                    <h5 class="text-info mt-4">💡 這三個 App 階段跟以上概念有何相關？</h5>
+                    <ul class="mb-0">
+                        <li><strong>第一階段 (原生 SDK)：</strong>展現模型底層的 <strong>Tool Calling</strong>。優點是<strong>開發快速、無框架負擔</strong>；缺點是當你想換模型（例如改用 OpenAI）或增加複雜記憶時，必須重寫大量底層邏輯。</li>
+                        <li><strong>第二階段 (LangChain)：</strong>升級為真正的 <strong>Agent</strong>。
+                            <ul>
+                                <li><strong>為什麼這階段會比較「方便」？</strong> 雖然 <code>agent.py</code> 看起來變長了，但 LangChain 幫你處理了「對話歷史自動管理」、「工具回傳格式自動解析」以及「跨模型支援」。</li>
+                                <li><strong>實務優點：</strong> 如果明天要串接 Tavily 搜尋引擎，LangChain 只要一行程式碼就能掛載，不用像原生 SDK 需手寫 API Request 與解析邏輯。</li>
+                            </ul>
+                        </li>
+                        <li><strong>第三階段 (Custom Graph)：</strong>當系統需要<strong>「精確控制」</strong>時的終極方案。
+                            <ul>
+                                <li>透過 LangGraph 解決 Agent 「太過自由、不受控」的問題。我們可以設計出「先搜尋 -> 交給人類確認 -> 再存檔」這種包含<strong>人工介入 (Human-in-the-loop)</strong> 的高階商業流程。</li>
+                            </ul>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- 三階段的APP介紹 Tab -->
+            <ul class="nav nav-pills mb-4" id="pills-tab" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="pills-phase1-tab" data-bs-toggle="pill" data-bs-target="#pills-phase1" type="button" role="tab" aria-controls="pills-phase1" aria-selected="true">第一階段：原生存取</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="pills-phase2-tab" data-bs-toggle="pill" data-bs-target="#pills-phase2" type="button" role="tab" aria-controls="pills-phase2" aria-selected="false">第二階段：LangChain</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="pills-phase3-tab" data-bs-toggle="pill" data-bs-target="#pills-phase3" type="button" role="tab" aria-controls="pills-phase3" aria-selected="false">第三階段：Custom Graph</button>
+                </li>
+            </ul>
+            
+            <div class="tab-content" id="pills-tabContent">
+                <div class="tab-pane fade show active markdown-body border p-4 bg-white rounded shadow-sm" id="pills-phase1" role="tabpanel" aria-labelledby="pills-phase1-tab">
+                    {{ content_phase1|safe }}
+                </div>
+                <div class="tab-pane fade markdown-body border p-4 bg-white rounded shadow-sm" id="pills-phase2" role="tabpanel" aria-labelledby="pills-phase2-tab">
+                    {{ content_phase2|safe }}
+                </div>
+                <div class="tab-pane fade markdown-body border p-4 bg-white rounded shadow-sm" id="pills-phase3" role="tabpanel" aria-labelledby="pills-phase3-tab">
+                    {{ content_phase3|safe }}
+                </div>
+            </div>
+
+            
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,413 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}YouTube 賽馬娘影片情感儀表板{% endblock %}
+
+{% block extra_css %}
+<style>
+  .stat-card {
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-surface);
+    border-radius: 12px;
+    padding: 1.25rem 1.5rem;
+    transition: box-shadow 0.2s ease, background-color 0.3s ease, border-color 0.3s ease;
+  }
+  .stat-card:hover {
+    box-shadow: 0 4px 16px var(--color-shadow-md);
+  }
+  .stat-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--color-accent);
+    line-height: 1.1;
+  }
+  .stat-label {
+    font-size: 0.8rem;
+    color: var(--color-text-secondary);
+    margin-top: 0.2rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* Video cards */
+  .video-card {
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-surface);
+    border-radius: 10px;
+    overflow: hidden;
+    transition: box-shadow 0.2s ease, transform 0.2s ease, background-color 0.3s ease, border-color 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+  .video-card:hover {
+    box-shadow: 0 6px 20px var(--color-shadow-md);
+    transform: translateY(-2px);
+  }
+  .video-card img {
+    width: 100%;
+    aspect-ratio: 16/9;
+    object-fit: cover;
+  }
+  .video-card .card-body {
+    padding: 0.85rem 1rem;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+  .video-title {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    line-height: 1.4;
+  }
+  .video-meta {
+    font-size: 0.75rem;
+    color: var(--color-text-secondary);
+  }
+
+  /* Sentiment badges */
+  .badge-pos { background: var(--color-positive); color: #fff; }
+  .badge-neu { background: var(--color-neutral-tone); color: #fff; }
+  .badge-neg { background: var(--color-negative); color: #fff; }
+
+  /* Search form */
+  .search-bar input {
+    background: var(--color-bg-base);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-primary);
+    transition: border-color 0.2s ease;
+  }
+  .search-bar input:focus {
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 3px rgba(124,58,237,0.15);
+    background: var(--color-bg-surface);
+    color: var(--color-text-primary);
+  }
+  .search-bar input::placeholder { color: var(--color-text-disabled); }
+
+  /* Chart section */
+  .chart-section {
+    background: var(--color-bg-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    transition: background-color 0.3s ease, border-color 0.3s ease;
+  }
+
+  /* Command badge */
+  .cmd-block {
+    background: var(--color-bg-base);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    padding: 0.75rem 1.2rem;
+    font-family: 'Courier New', monospace;
+    font-size: 0.88rem;
+    color: var(--color-accent);
+    transition: background-color 0.3s ease, border-color 0.3s ease;
+  }
+
+  .section-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--color-text-primary);
+    border-left: 4px solid var(--color-accent);
+    padding-left: 0.75rem;
+    margin-bottom: 1rem;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="col-lg-12">
+
+  <!-- Page header -->
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3 mt-1">
+    <div>
+      <h4 class="fw-bold mb-0" style="color:var(--color-text-primary);">
+        ▶ YouTube 賽馬娘影片情感儀表板
+      </h4>
+      <div class="text-secondary" style="font-size:0.82rem;">
+        共 {{ total_videos }} 部影片・{{ total_comments }} 則留言
+      </div>
+    </div>
+    <a href="{% url 'app_youtube_uma:dashboard' %}" class="btn btn-sm btn-outline-secondary">重設篩選</a>
+  </div>
+
+  <!-- Stats cards row -->
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+      <div class="stat-card">
+        <div class="stat-value">{{ total_videos }}</div>
+        <div class="stat-label">總影片數</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card">
+        <div class="stat-value">{{ stats.total|default:"0" }}</div>
+        <div class="stat-label">已分析影片</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card">
+        <div class="stat-value" style="color:var(--color-positive);">
+          {% if stats.total and stats.total > 0 %}
+            {{ stats.pos_count }}
+            <small style="font-size:1rem;">({% widthratio stats.pos_count stats.total 100 %}%)</small>
+          {% else %}—{% endif %}
+        </div>
+        <div class="stat-label">正面影片 (&ge;0.6)</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card">
+        <div class="stat-value">
+          {% if stats.avg_sentiment %}
+            {{ stats.avg_sentiment|floatformat:2 }}
+          {% else %}—{% endif %}
+        </div>
+        <div class="stat-label">平均情感分數</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Search bar -->
+  <form method="get" class="search-bar mb-4">
+    <div class="input-group" style="max-width:500px;">
+      <input type="text" class="form-control" name="q" value="{{ query }}"
+             placeholder="搜尋影片標題或頻道名稱…">
+      <button class="btn" type="submit"
+              style="background:var(--color-accent);color:#fff;border-color:var(--color-accent);">
+        搜尋
+      </button>
+      {% if query %}
+      <a href="{% url 'app_youtube_uma:dashboard' %}" class="btn btn-outline-secondary">✕</a>
+      {% endif %}
+    </div>
+  </form>
+
+  <!-- Sentiment trend chart -->
+  <div class="chart-section mb-4">
+    <div class="section-title">情感趨勢（週維度）</div>
+    <div class="chart-wrapper">
+      <div class="chart-skeleton" id="chartSkeleton"></div>
+      <div class="chart-canvas-wrap is-loading" id="chartWrap">
+        <canvas id="trendChart" height="100"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Video cards -->
+  <div class="section-title">
+    熱門影片（觀看數前 20）
+    {% if query %}<span class="badge" style="background:var(--color-accent-muted);color:var(--color-accent);font-size:0.78rem;">篩選：{{ query }}</span>{% endif %}
+  </div>
+
+  {% if videos %}
+  <div class="row g-3 mb-4">
+    {% for v in videos %}
+    <div class="col-12 col-sm-6 col-md-4 col-lg-3">
+      <div class="video-card">
+        {% if v.thumbnail_url %}
+        <a href="https://www.youtube.com/watch?v={{ v.video_id }}" target="_blank" rel="noopener">
+          <img src="{{ v.thumbnail_url }}" alt="{{ v.title }}" loading="lazy">
+        </a>
+        {% endif %}
+        <div class="card-body">
+          <a href="https://www.youtube.com/watch?v={{ v.video_id }}" target="_blank" rel="noopener"
+             class="video-title text-decoration-none">{{ v.title }}</a>
+          <div class="video-meta">
+            <span title="頻道">📺 {{ v.channel_name|default:"—" }}</span>
+          </div>
+          <div class="video-meta">
+            {% if v.published_at %}
+            <span>{{ v.published_at|date:"Y-m-d" }}</span> ·
+            {% endif %}
+            👁 {{ v.view_count|default:0 }} &nbsp; 👍 {{ v.like_count|default:0 }}
+          </div>
+          <div class="mt-auto pt-1">
+            {% if v.sentiment is not None %}
+              {% if v.sentiment >= 0.6 %}
+                <span class="badge badge-pos">正面 {{ v.sentiment|floatformat:2 }}</span>
+              {% elif v.sentiment <= 0.4 %}
+                <span class="badge badge-neg">負面 {{ v.sentiment|floatformat:2 }}</span>
+              {% else %}
+                <span class="badge badge-neu">中立 {{ v.sentiment|floatformat:2 }}</span>
+              {% endif %}
+            {% else %}
+              <span class="badge" style="background:var(--color-border);color:var(--color-text-secondary);">未分析</span>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state text-center py-5">
+    <div class="empty-icon" style="font-size:3rem;">📭</div>
+    <p class="mt-2">目前沒有符合條件的影片</p>
+  </div>
+  {% endif %}
+
+  <!-- Crawl command hint -->
+  <div class="chart-section mb-4">
+    <div class="section-title">執行爬蟲</div>
+    <p class="text-secondary" style="font-size:0.88rem;">在專案根目錄執行以下指令，可爬取最新 YouTube 賽馬娘影片與留言：</p>
+    <div class="cmd-block mb-2">python manage.py crawl_youtube</div>
+    <div class="cmd-block mb-2">python manage.py crawl_youtube --max-videos 30 --max-comments 100</div>
+    <p class="text-secondary mt-2" style="font-size:0.82rem;">
+      排程器每 6 小時自動執行增量爬取，每日凌晨 3 時執行 Gemini 情感分析標記。
+    </p>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+  var skeleton  = document.getElementById('chartSkeleton');
+  var chartWrap = document.getElementById('chartWrap');
+  var ctx       = document.getElementById('trendChart').getContext('2d');
+  var chart     = null;
+
+  function getAccent() {
+    return getComputedStyle(document.documentElement)
+      .getPropertyValue('--color-accent').trim() || '#7C3AED';
+  }
+  function getPositive() {
+    return getComputedStyle(document.documentElement)
+      .getPropertyValue('--color-positive').trim() || '#2E9E6B';
+  }
+  function getTextSecondary() {
+    return getComputedStyle(document.documentElement)
+      .getPropertyValue('--color-text-secondary').trim() || '#6B6560';
+  }
+  function getBorder() {
+    return getComputedStyle(document.documentElement)
+      .getPropertyValue('--color-border').trim() || '#E4E0D8';
+  }
+
+  function buildChart(data) {
+    var weeks     = data.weekly_trend.map(function (d) { return d.week; });
+    var counts    = data.weekly_trend.map(function (d) { return d.count; });
+    var sentis    = data.weekly_trend.map(function (d) { return d.avg_sentiment; });
+    var accent    = getAccent();
+    var positive  = getPositive();
+    var textColor = getTextSecondary();
+    var gridColor = getBorder();
+
+    if (chart) chart.destroy();
+
+    chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: weeks,
+        datasets: [
+          {
+            label: '影片數',
+            data: counts,
+            borderColor: accent,
+            backgroundColor: accent + '22',
+            yAxisID: 'yCount',
+            tension: 0.35,
+            fill: true,
+            pointRadius: 3,
+          },
+          {
+            label: '平均情感分數',
+            data: sentis,
+            borderColor: positive,
+            backgroundColor: 'transparent',
+            yAxisID: 'ySenti',
+            tension: 0.35,
+            borderDash: [5, 3],
+            pointRadius: 3,
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { labels: { color: textColor, font: { size: 12 } } },
+          tooltip: { backgroundColor: '#1E1A18', titleColor: '#fff', bodyColor: '#ccc' }
+        },
+        scales: {
+          x: {
+            ticks: { color: textColor, maxRotation: 30 },
+            grid: { color: gridColor }
+          },
+          yCount: {
+            type: 'linear', position: 'left',
+            ticks: { color: textColor },
+            grid: { color: gridColor },
+            title: { display: true, text: '影片數', color: textColor, font: { size: 11 } }
+          },
+          ySenti: {
+            type: 'linear', position: 'right',
+            min: 0, max: 1,
+            ticks: { color: textColor },
+            grid: { drawOnChartArea: false },
+            title: { display: true, text: '情感分數', color: textColor, font: { size: 11 } }
+          }
+        }
+      }
+    });
+
+    if (skeleton) skeleton.style.display = 'none';
+    chartWrap.classList.remove('is-loading');
+    chartWrap.classList.add('is-loaded');
+  }
+
+  var statsUrl = "{% url 'app_youtube_uma:api_stats' %}";
+  {% if query %}statsUrl += '?q={{ query|urlencode }}';{% endif %}
+
+  fetch(statsUrl)
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (data.weekly_trend && data.weekly_trend.length) {
+        buildChart(data);
+      } else {
+        if (skeleton) skeleton.style.display = 'none';
+        chartWrap.innerHTML = '<div class="empty-state text-center py-4"><div class="empty-icon" style="font-size:2.5rem;">📊</div><p class="mt-2 text-secondary">尚無情感趨勢資料，請先執行爬蟲與情感分析。</p></div>';
+        chartWrap.classList.remove('is-loading');
+      }
+    })
+    .catch(function () {
+      if (skeleton) skeleton.style.display = 'none';
+      chartWrap.classList.remove('is-loading');
+    });
+
+  /* Re-draw chart on theme toggle to pick up new CSS variables */
+  var themeBtn = document.getElementById('themeToggleBtn');
+  if (themeBtn) {
+    themeBtn.addEventListener('click', function () {
+      setTimeout(function () {
+        if (chart) {
+          chart.options.plugins.legend.labels.color = getTextSecondary();
+          chart.options.scales.x.ticks.color = getTextSecondary();
+          chart.options.scales.x.grid.color = getBorder();
+          chart.options.scales.yCount.ticks.color = getTextSecondary();
+          chart.options.scales.yCount.grid.color = getBorder();
+          chart.options.scales.yCount.title.color = getTextSecondary();
+          chart.options.scales.ySenti.ticks.color = getTextSecondary();
+          chart.options.scales.ySenti.title.color = getTextSecondary();
+          chart.data.datasets[0].borderColor = getAccent();
+          chart.data.datasets[0].backgroundColor = getAccent() + '22';
+          chart.data.datasets[1].borderColor = getPositive();
+          chart.update();
+        }
+      }, 400);
+    });
+  }
+})();
+</script>
+{% endblock %}

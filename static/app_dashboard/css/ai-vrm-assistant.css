@@ -1,0 +1,276 @@
+/* root 寬度已放大，與 canvas-wrap 同寬，pointer-events: none 讓透明區域點擊穿透。 */
+.ai-vrm-assistant-root {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  width: 350px;
+  z-index: 1600;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* canvas-wrap 直接放大至 350×450，給揮手等肢體動作足夠空間；
+   背景全透明，不再用負值出血，渲染器直接填滿容器。 */
+.ai-vrm-assistant-canvas-wrap {
+  position: relative;
+  width: 350px;
+  height: 450px;
+  border-radius: 18px;
+  background: transparent;
+  overflow: visible;
+}
+
+.ai-vrm-assistant-canvas-wrap canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+}
+
+/* speech 位於 canvas-wrap 上方（正常流），不再絕對定位於 canvas 內部。
+   使用 max-height 動畫：隱藏時高度收合至 0，出現時由下向上展開。 */
+.ai-vrm-assistant-speech {
+  display: block;
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  margin-bottom: 0;
+  pointer-events: none;
+  background: var(--color-bg-elevated);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  backdrop-filter: blur(12px);
+  transition: max-height 0.34s cubic-bezier(0.34, 1.56, 0.64, 1),
+    opacity 0.26s ease,
+    margin-bottom 0.28s ease;
+}
+
+.ai-vrm-assistant-speech.is-visible {
+  max-height: 200px;
+  overflow: visible;
+  opacity: 1;
+  margin-bottom: 10px;
+  box-shadow: 0 12px 25px var(--color-shadow-md);
+}
+
+/* 尾巴箭頭：指向下方的人物，在 overflow:visible 時顯示。 */
+.ai-vrm-assistant-speech::after {
+  content: "";
+  position: absolute;
+  left: 24px;
+  bottom: -8px;
+  width: 14px;
+  height: 14px;
+  transform: rotate(45deg);
+  background: var(--color-bg-elevated);
+  border-right: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.ai-vrm-assistant-presets {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  padding: 28px 8px 10px;
+  pointer-events: auto;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  background: transparent;
+}
+
+.ai-vrm-assistant-presets button {
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-surface);
+  backdrop-filter: blur(10px);
+  color: var(--color-text-primary);
+  font-size: 11.5px;
+  line-height: 1.1;
+  padding: 6px 11px;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform 0.18s ease, box-shadow 0.18s ease,
+    background 0.18s ease, border-color 0.18s ease;
+}
+
+.ai-vrm-assistant-presets button:hover {
+  transform: translateY(-2px);
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent);
+  box-shadow: 0 6px 16px var(--color-glow-purple),
+    0 0 12px var(--color-glow-purple);
+}
+
+.ai-vrm-assistant-presets button:active {
+  transform: translateY(0);
+}
+
+.ai-vrm-assistant-chat {
+  margin-top: 8px;
+  pointer-events: auto;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px;
+  border-radius: 14px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-surface);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 24px var(--color-shadow-sm);
+}
+
+.ai-vrm-assistant-chat input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+  color: var(--color-text-primary);
+  border-radius: 10px;
+  padding: 9px 10px;
+  font-size: 13px;
+  outline: none;
+}
+
+.ai-vrm-assistant-chat input::placeholder {
+  color: var(--color-text-secondary);
+}
+
+.ai-vrm-assistant-chat button {
+  border: 0;
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, var(--color-accent), color-mix(in srgb, var(--color-accent) 60%, #fff));
+  box-shadow: 0 6px 18px var(--color-glow-purple);
+}
+
+.ai-vrm-assistant-chat button:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+}
+
+/* ── body wrapper：透明傳遞，收起時淡出縮小 ─────────────────────────── */
+.ai-vrm-assistant-body {
+  transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: bottom right;
+}
+
+.ai-vrm-assistant-root.is-collapsed .ai-vrm-assistant-body {
+  opacity: 0;
+  transform: scale(0.94) translateY(10px);
+  pointer-events: none;
+}
+
+/* ── toggle 按鈕列 ──────────────────────────────────────────────────── */
+.ai-vrm-assistant-toggle {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 8px;
+}
+
+.ai-vrm-assistant-toggle-btn {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-surface);
+  backdrop-filter: blur(10px);
+  color: var(--color-text-secondary);
+  border-radius: 999px;
+  padding: 5px 13px 5px 10px;
+  font-size: 11.5px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px var(--color-shadow-sm);
+  transition: transform 0.18s ease, box-shadow 0.18s ease,
+    background 0.2s ease, border-color 0.2s ease, color 0.2s ease,
+    padding 0.2s ease, font-size 0.2s ease;
+}
+
+.ai-vrm-assistant-toggle-btn:hover {
+  transform: translateY(-2px);
+  border-color: var(--color-accent);
+  box-shadow: 0 6px 20px var(--color-glow-purple);
+}
+
+/* 收起時按鈕升格為 FAB 樣式，更顯眼 */
+.ai-vrm-assistant-root.is-collapsed .ai-vrm-assistant-toggle-btn {
+  background: linear-gradient(
+    135deg,
+    var(--color-accent),
+    color-mix(in srgb, var(--color-accent) 60%, #fff)
+  );
+  border-color: transparent;
+  color: #fff;
+  padding: 10px 20px;
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: 0 8px 28px var(--color-glow-purple);
+}
+
+/* 收起時按鈕 hover 效果加強 */
+.ai-vrm-assistant-root.is-collapsed .ai-vrm-assistant-toggle-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 32px var(--color-glow-purple);
+}
+
+/* icon 切換：展開時只顯示「收起」圖示，收起時只顯示「展開」圖示 */
+.vrm-toggle-show {
+  display: none;
+}
+.vrm-toggle-hide {
+  display: inline;
+}
+.ai-vrm-assistant-root.is-collapsed .vrm-toggle-show {
+  display: inline;
+}
+.ai-vrm-assistant-root.is-collapsed .vrm-toggle-hide {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .ai-vrm-assistant-root {
+    right: 10px;
+    bottom: 10px;
+    width: 300px;
+  }
+
+  .ai-vrm-assistant-canvas-wrap {
+    width: 300px;
+    height: 390px;
+  }
+
+  .ai-vrm-assistant-canvas-wrap canvas {
+    top: 0;
+    left: 0;
+    width: 100% !important;
+    height: 100% !important;
+  }
+
+  .ai-vrm-assistant-speech {
+    max-width: 220px;
+    font-size: 12px;
+  }
+
+  .ai-vrm-assistant-presets {
+    padding: 22px 6px 8px;
+    gap: 5px;
+  }
+
+  .ai-vrm-assistant-presets button {
+    font-size: 10.5px;
+    padding: 5px 9px;
+  }
+}

@@ -1,0 +1,355 @@
+{% extends "base.html" %}
+
+{% block title %}課程功能架構 — 賽馬娘資訊平台{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* Timeline */
+  .timeline { position: relative; padding-left: 2.5rem; }
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 18px; top: 0; bottom: 0;
+    width: 2px;
+    background: var(--color-border);
+  }
+  .timeline-item { position: relative; margin-bottom: 2rem; }
+  .timeline-dot {
+    position: absolute;
+    left: -2.5rem;
+    top: 4px;
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: var(--color-accent);
+    color: #fff;
+    font-size: 0.8rem;
+    font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    border: 3px solid var(--color-bg-base);
+    z-index: 1;
+  }
+  .timeline-card {
+    background: var(--color-bg-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+    transition: box-shadow 0.2s, transform 0.2s;
+  }
+  .timeline-card:hover {
+    box-shadow: 0 4px 16px var(--color-shadow-md);
+    transform: translateX(4px);
+  }
+  .timeline-phase {
+    font-size: 0.7rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.07em;
+    color: var(--color-text-disabled);
+    margin-bottom: 3px;
+  }
+  .timeline-title {
+    font-size: 1rem; font-weight: 700;
+    color: var(--color-text-primary);
+    margin-bottom: 0.4rem;
+  }
+  .timeline-desc {
+    font-size: 0.86rem;
+    color: var(--color-text-secondary);
+    line-height: 1.65;
+    margin-bottom: 0.5rem;
+  }
+  .tech-tag {
+    display: inline-block;
+    font-size: 0.72rem;
+    padding: 2px 8px;
+    border-radius: 12px;
+    background: var(--color-accent-muted);
+    color: var(--color-accent);
+    font-weight: 600;
+    margin: 2px 2px 0 0;
+  }
+  .tech-tag.green {
+    background: color-mix(in srgb, var(--color-positive) 15%, transparent);
+    color: var(--color-positive);
+  }
+  .tech-tag.red {
+    background: color-mix(in srgb, var(--color-negative) 15%, transparent);
+    color: var(--color-negative);
+  }
+  .tech-tag.discord { background: rgba(88,101,242,0.12); color: #5865F2; }
+  .source-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 0.78rem;
+    padding: 3px 10px;
+    border-radius: 20px;
+    border: 1px solid var(--color-border);
+    color: var(--color-text-secondary);
+    margin: 3px 3px 0 0;
+  }
+  .arch-overview {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+  .arch-box {
+    background: var(--color-bg-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    padding: 1rem;
+    text-align: center;
+  }
+  .arch-box-icon { font-size: 2rem; margin-bottom: 0.4rem; }
+  .arch-box-title { font-size: 0.88rem; font-weight: 700; color: var(--color-text-primary); }
+  .arch-box-sub { font-size: 0.78rem; color: var(--color-text-secondary); margin-top: 4px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="col-lg-12 mt-3">
+
+  <!-- Breadcrumb -->
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb" style="font-size:0.84rem;">
+      <li class="breadcrumb-item"><a href="{% url 'app_course_intro:index' %}" style="color:var(--color-accent);">平台技術說明</a></li>
+      <li class="breadcrumb-item active">課程功能架構</li>
+    </ol>
+  </nav>
+
+  <h2 class="mb-1">🏗 賽馬娘資訊平台 — 功能架構總覽</h2>
+  <p class="text-muted mb-4" style="font-size:0.9rem;">
+    從資料爬取到 AI Agent 的完整技術演進，共 9 大功能模組。
+  </p>
+
+  <!-- Quick Overview -->
+  <div class="arch-overview">
+    <div class="arch-box">
+      <div class="arch-box-icon">🕷</div>
+      <div class="arch-box-title">資料層</div>
+      <div class="arch-box-sub">5 來源爬蟲 + DB 儲存</div>
+    </div>
+    <div class="arch-box">
+      <div class="arch-box-icon">📊</div>
+      <div class="arch-box-title">分析層</div>
+      <div class="arch-box-sub">情緒分析 + 關鍵詞統計</div>
+    </div>
+    <div class="arch-box">
+      <div class="arch-box-icon">🤖</div>
+      <div class="arch-box-title">AI Agent 層</div>
+      <div class="arch-box-sub">3 階段 Agent 演進</div>
+    </div>
+    <div class="arch-box">
+      <div class="arch-box-icon">🔍</div>
+      <div class="arch-box-title">RAG 層</div>
+      <div class="arch-box-sub">FAISS + Agentic RAG</div>
+    </div>
+    <div class="arch-box">
+      <div class="arch-box-icon">🌐</div>
+      <div class="arch-box-title">整合層</div>
+      <div class="arch-box-sub">Discord Bot + YouTube</div>
+    </div>
+  </div>
+
+  <!-- Timeline -->
+  <div class="timeline">
+
+    <!-- 1. 新聞爬蟲 -->
+    <div class="timeline-item">
+      <div class="timeline-dot">1</div>
+      <div class="timeline-card">
+        <div class="timeline-phase">資料層 · Phase 1</div>
+        <div class="timeline-title">🕷 新聞爬蟲（5 個來源）</div>
+        <div class="timeline-desc">
+          定期爬取賽馬娘相關公告與新聞，儲存至 <code>GameAnnouncement</code> 資料表。
+          支援排程自動執行，覆蓋繁中主要媒體平台。
+        </div>
+        <div>
+          <span class="source-chip">📢 Bilibili BWIKI</span>
+          <span class="source-chip">🎮 巴哈姆特哈啦板</span>
+          <span class="source-chip">📰 聯合新聞網</span>
+          <span class="source-chip">📰 ETtoday</span>
+          <span class="source-chip">📰 宅宅新聞</span>
+        </div>
+        <div class="mt-2">
+          <span class="tech-tag">requests / BeautifulSoup</span>
+          <span class="tech-tag">APScheduler</span>
+          <span class="tech-tag">Django ORM</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. 情緒分析管線 -->
+    <div class="timeline-item">
+      <div class="timeline-dot">2</div>
+      <div class="timeline-card">
+        <div class="timeline-phase">分析層 · Phase 2</div>
+        <div class="timeline-title">📊 情緒分析管線</div>
+        <div class="timeline-desc">
+          雙軌情緒分析：使用 Gemini API 對公告進行三分類標記（正/中/負），
+          使用 SnowNLP 對 Bilibili 評論進行快速情緒評分。
+          分析結果存入資料庫，供儀表板視覺化呈現。
+        </div>
+        <div class="mt-2">
+          <span class="tech-tag">Gemini API</span>
+          <span class="tech-tag">SnowNLP</span>
+          <span class="tech-tag green">正面 / 中立 / 負面</span>
+          <span class="tech-tag">Chart.js 儀表板</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. AI Agent Phase 1 -->
+    <div class="timeline-item">
+      <div class="timeline-dot">3</div>
+      <div class="timeline-card">
+        <div class="timeline-phase">AI Agent 層 · Phase 3a</div>
+        <div class="timeline-title">🧠 AI Agent — 基礎對話 (app_agent_uma)</div>
+        <div class="timeline-desc">
+          第一階段 Agent：單輪 LLM 呼叫 + DB 查詢。
+          使用者輸入問題，後端查詢 <code>GameAnnouncement</code> 並注入 Prompt，
+          由 Gemini / Claude 生成回答。不具備 Function Calling 能力。
+        </div>
+        <div class="mt-2">
+          <span class="tech-tag">Gemini 2.5 Flash</span>
+          <span class="tech-tag">System Prompt 設計</span>
+          <span class="tech-tag">Session 對話歷史</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. RAG 知識庫 -->
+    <div class="timeline-item">
+      <div class="timeline-dot">4</div>
+      <div class="timeline-card">
+        <div class="timeline-phase">RAG 層 · Phase 3b</div>
+        <div class="timeline-title">🔍 RAG 知識庫問答 (app_rag_uma)</div>
+        <div class="timeline-desc">
+          建立 FAISS 向量索引：將所有公告文字以 Gemini Embedding 模型轉為向量，
+          儲存為 <code>uma_knowledge.faiss</code> 與 <code>uma_knowledge_texts.pkl</code>。
+          使用者提問時，先做語意搜尋取回最相關段落，再注入 Prompt 讓 LLM 回答。
+        </div>
+        <div class="mt-2">
+          <span class="tech-tag">FAISS</span>
+          <span class="tech-tag">gemini-embedding-001</span>
+          <span class="tech-tag">Top-K 語意搜尋</span>
+          <span class="tech-tag">RAG Pipeline</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. Agentic RAG -->
+    <div class="timeline-item">
+      <div class="timeline-dot">5</div>
+      <div class="timeline-card">
+        <div class="timeline-phase">RAG 層 · Phase 3c</div>
+        <div class="timeline-title">🤖 Agentic RAG (app_rag_agent)</div>
+        <div class="timeline-desc">
+          進階架構：LLM 具備 Function Calling 能力，可動態決定呼叫哪個工具。
+          工具一：<code>search_uma_announcements</code>（語意搜尋 FAISS + DB 模糊比對）。
+          工具二：<code>list_announcements_by_category</code>（精確分類查詢）。
+          透過多輪 Agentic 迴圈完成複雜查詢，並引用來源。
+        </div>
+        <div class="mt-2">
+          <span class="tech-tag">Function Calling</span>
+          <span class="tech-tag">Agentic Loop</span>
+          <span class="tech-tag">FAISS 語意搜尋</span>
+          <span class="tech-tag">DB 精確查詢</span>
+          <span class="tech-tag">marked.js 渲染</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6. LangChain Agent -->
+    <div class="timeline-item">
+      <div class="timeline-dot">6</div>
+      <div class="timeline-card">
+        <div class="timeline-phase">AI Agent 層 · Phase 4a</div>
+        <div class="timeline-title">⛓ LangChain Agent</div>
+        <div class="timeline-desc">
+          以 LangChain 框架重構 Agent：使用 <code>AgentExecutor</code> + <code>Tool</code> 定義工具，
+          支援 ReAct 推理模式（思考 → 行動 → 觀察 → 再思考）。
+          整合 LangChain Memory 管理多輪對話，支援 Streaming 輸出。
+        </div>
+        <div class="mt-2">
+          <span class="tech-tag">LangChain</span>
+          <span class="tech-tag">ReAct Agent</span>
+          <span class="tech-tag">AgentExecutor</span>
+          <span class="tech-tag green">Streaming 輸出</span>
+          <span class="tech-tag">ConversationMemory</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 7. LangGraph Agent -->
+    <div class="timeline-item">
+      <div class="timeline-dot">7</div>
+      <div class="timeline-card">
+        <div class="timeline-phase">AI Agent 層 · Phase 4b</div>
+        <div class="timeline-title">🕸 LangGraph Agent</div>
+        <div class="timeline-desc">
+          以有向圖（DAG）定義 Agent 工作流：節點（Node）代表步驟，
+          邊（Edge）代表條件路由。支援條件分支、回環、平行執行節點。
+          比 LangChain AgentExecutor 更靈活，適合複雜多工 Agent 設計。
+        </div>
+        <div class="mt-2">
+          <span class="tech-tag">LangGraph</span>
+          <span class="tech-tag">StateGraph</span>
+          <span class="tech-tag">條件路由 Edge</span>
+          <span class="tech-tag green">平行節點</span>
+          <span class="tech-tag">Checkpointing</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 8. Discord Bot -->
+    <div class="timeline-item">
+      <div class="timeline-dot">8</div>
+      <div class="timeline-card">
+        <div class="timeline-phase">整合層 · Phase 5a</div>
+        <div class="timeline-title">💬 Discord Bot 整合</div>
+        <div class="timeline-desc">
+          Discord Bot 作為前端互動介面：透過 Slash 指令觸發 RAG 問答、
+          公告查詢、情緒分析報告。同時可在指定頻道自動推播最新爬取公告，
+          嵌入卡片展示角色情報。
+        </div>
+        <div class="mt-2">
+          <span class="tech-tag discord">discord.py</span>
+          <span class="tech-tag discord">Slash Commands</span>
+          <span class="tech-tag discord">Embed Cards</span>
+          <span class="tech-tag">RAG API 呼叫</span>
+          <span class="tech-tag">自動推播</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 9. YouTube 整合 -->
+    <div class="timeline-item">
+      <div class="timeline-dot">9</div>
+      <div class="timeline-card">
+        <div class="timeline-phase">整合層 · Phase 5b</div>
+        <div class="timeline-title">▶ YouTube 整合</div>
+        <div class="timeline-desc">
+          透過 YouTube Data API v3 搜尋賽馬娘相關影片，
+          抓取留言進行情緒分析，並將熱門影片資訊嵌入 Discord 頻道。
+          支援關鍵詞觀看聲量趨勢分析。
+        </div>
+        <div class="mt-2">
+          <span class="tech-tag red">YouTube Data API v3</span>
+          <span class="tech-tag">search.list</span>
+          <span class="tech-tag">commentThreads.list</span>
+          <span class="tech-tag">SnowNLP 評論情緒</span>
+          <span class="tech-tag discord">Discord 嵌入</span>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /timeline -->
+
+  <!-- Back -->
+  <div class="mt-2 mb-5">
+    <a href="{% url 'app_course_intro:index' %}" class="btn"
+       style="border:1px solid var(--color-border);color:var(--color-text-secondary);font-size:0.88rem;">
+      ← 返回平台技術說明
+    </a>
+  </div>
+
+</div>
+{% endblock %}

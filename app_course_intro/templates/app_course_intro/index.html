@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}平台技術說明 — 賽馬娘資訊平台{% endblock %}
+
+{% block extra_css %}
+<style>
+  .intro-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    text-decoration: none;
+    display: block;
+  }
+  .intro-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px var(--color-shadow-md) !important;
+  }
+  .intro-icon {
+    font-size: 2.8rem;
+    margin-bottom: 0.75rem;
+  }
+  .intro-card .card-title { color: var(--color-text-primary); }
+  .intro-card .card-text  { color: var(--color-text-secondary); font-size:0.9rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="col-lg-12 mt-4">
+
+  <div class="text-center mb-5">
+    <h2 class="mb-2">📚 平台技術說明</h2>
+    <p class="text-muted" style="font-size:0.95rem; max-width:600px; margin:0 auto;">
+      本平台整合多項 API 與 AI 技術，構成完整的賽馬娘資訊分析生態系。<br>
+      選擇下方項目以了解詳細說明。
+    </p>
+  </div>
+
+  <div class="row g-4 justify-content-center">
+
+    <div class="col-md-5">
+      <a href="{% url 'app_course_intro:api_introduction' %}" class="intro-card card h-100 p-4">
+        <div class="card-body text-center">
+          <div class="intro-icon">🔌</div>
+          <h4 class="card-title">API 技術介紹</h4>
+          <p class="card-text">
+            了解本平台使用的所有外部 API，包含 Google Gemini、Anthropic Claude、
+            YouTube Data API 以及 Discord Bot API 的用途、限制與使用方式。
+          </p>
+          <div class="mt-3">
+            <span class="badge" style="background:var(--color-accent-muted);color:var(--color-accent);">Gemini</span>
+            <span class="badge" style="background:var(--color-accent-muted);color:var(--color-accent);">Claude</span>
+            <span class="badge" style="background:var(--color-accent-muted);color:var(--color-accent);">YouTube</span>
+            <span class="badge" style="background:var(--color-accent-muted);color:var(--color-accent);">Discord</span>
+          </div>
+        </div>
+      </a>
+    </div>
+
+    <div class="col-md-5">
+      <a href="{% url 'app_course_intro:course_introduction' %}" class="intro-card card h-100 p-4">
+        <div class="card-body text-center">
+          <div class="intro-icon">🏗</div>
+          <h4 class="card-title">課程功能架構</h4>
+          <p class="card-text">
+            完整說明賽馬娘資訊平台的功能架構演進，涵蓋爬蟲、情緒分析、AI Agent 三階段、
+            RAG 知識庫、Agentic RAG、LangChain、LangGraph 與 Discord/YouTube 整合。
+          </p>
+          <div class="mt-3">
+            <span class="badge" style="background:var(--color-accent-muted);color:var(--color-accent);">RAG</span>
+            <span class="badge" style="background:var(--color-accent-muted);color:var(--color-accent);">LangChain</span>
+            <span class="badge" style="background:var(--color-accent-muted);color:var(--color-accent);">LangGraph</span>
+            <span class="badge" style="background:var(--color-accent-muted);color:var(--color-accent);">Discord Bot</span>
+          </div>
+        </div>
+      </a>
+    </div>
+
+  </div>
+
+  <!-- Back link -->
+  <div class="text-center mt-5">
+    <a href="/" class="btn" style="border:1px solid var(--color-border);color:var(--color-text-secondary);">
+      ← 返回首頁
+    </a>
+  </div>
+
+</div>
+{% endblock %}

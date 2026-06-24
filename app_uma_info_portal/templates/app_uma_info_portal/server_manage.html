@@ -1,0 +1,1072 @@
+{% extends 'app_uma_info_portal/base_portal.html' %}
+{% load static %}
+
+{% block title %}{{ guild.name }} 設定 — UMA Info{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* ── 管理頁佈局 ──────────────────────────────────────── */
+  .manage-layout {
+    display: flex;
+    min-height: calc(100svh - 60px);
+  }
+
+  /* ── 側邊欄 ────────────────────────────────────────── */
+  .manage-sidebar {
+    width: 240px;
+    flex-shrink: 0;
+    background: var(--color-bg-elevated);
+    border-right: 1px solid var(--color-border);
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: 60px;
+    height: calc(100svh - 60px);
+    overflow-y: auto;
+  }
+  .sidebar-header {
+    padding: 20px 16px 14px;
+    border-bottom: 1px solid var(--color-border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .sidebar-guild-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    object-fit: cover;
+    flex-shrink: 0;
+    background: var(--color-accent-soft);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--color-accent);
+  }
+  .sidebar-guild-name {
+    font-weight: 700;
+    font-size: .9rem;
+    line-height: 1.3;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+  .sidebar-guild-id {
+    font-size: .72rem;
+    color: var(--color-text-disabled);
+    margin-top: 2px;
+  }
+
+  .sidebar-nav {
+    padding: 10px 8px;
+    flex: 1;
+  }
+  .sidebar-section-title {
+    font-size: .72rem;
+    font-weight: 700;
+    color: var(--color-text-disabled);
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    padding: 8px 10px 4px;
+  }
+  .sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 10px;
+    border-radius: var(--radius-md);
+    color: var(--color-text-secondary);
+    text-decoration: none;
+    font-size: .875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background .15s, color .15s;
+    border: none;
+    background: transparent;
+    width: 100%;
+    text-align: left;
+  }
+  .sidebar-item:hover {
+    background: var(--color-accent-soft);
+    color: var(--color-text-primary);
+  }
+  .sidebar-item.active {
+    background: var(--color-accent-soft);
+    color: var(--color-accent);
+    font-weight: 700;
+  }
+  .sidebar-item .icon { width: 18px; text-align: center; font-size: 1rem; }
+
+  .sidebar-back {
+    padding: 12px 8px;
+    border-top: 1px solid var(--color-border);
+  }
+
+  /* ── 主內容 ─────────────────────────────────────────── */
+  .manage-main {
+    flex: 1;
+    min-width: 0;
+    padding: 32px;
+    overflow-y: auto;
+  }
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  .panel-header {
+    margin-bottom: 28px;
+  }
+  .panel-header h2 {
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: -.02em;
+    margin-bottom: 4px;
+  }
+  .panel-header p { color: var(--color-text-secondary); font-size: .9rem; }
+
+  /* ── 統計卡片 ────────────────────────────────────────── */
+  .stat-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 14px;
+    margin-bottom: 28px;
+  }
+  .stat-card {
+    background: var(--color-bg-elevated);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: 16px;
+    text-align: center;
+  }
+  .stat-card .val {
+    font-size: 1.7rem;
+    font-weight: 900;
+    letter-spacing: -.04em;
+    color: var(--color-text-primary);
+  }
+  .stat-card .lbl {
+    font-size: .78rem;
+    color: var(--color-text-secondary);
+    margin-top: 3px;
+  }
+
+  /* ── 設定表單 ───────────────────────────────────────── */
+  .setting-section {
+    background: var(--color-bg-elevated);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: 22px 24px;
+    margin-bottom: 20px;
+  }
+  .setting-section-title {
+    font-weight: 700;
+    font-size: .9rem;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .form-label-sm {
+    font-size: .82rem;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    margin-bottom: 6px;
+    display: block;
+  }
+  .form-select-custom, .form-input-custom {
+    width: 100%;
+    padding: 9px 14px;
+    background: var(--color-bg-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    color: var(--color-text-primary);
+    font-size: .875rem;
+    transition: border-color .2s;
+    outline: none;
+  }
+  .form-select-custom:focus, .form-input-custom:focus {
+    border-color: var(--color-accent);
+  }
+
+  /* 切換開關 */
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+  .toggle-row:last-child { border-bottom: none; }
+  .toggle-label { font-size: .9rem; }
+  .toggle-desc { font-size: .78rem; color: var(--color-text-secondary); margin-top: 2px; }
+  .toggle-switch {
+    position: relative;
+    width: 42px;
+    height: 24px;
+    flex-shrink: 0;
+  }
+  .toggle-switch input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    inset: 0;
+    background: var(--color-border);
+    border-radius: 12px;
+    transition: .2s;
+  }
+  .toggle-slider::before {
+    content: '';
+    position: absolute;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: #fff;
+    left: 3px; bottom: 3px;
+    transition: .2s;
+    box-shadow: 0 1px 4px rgba(0,0,0,.25);
+  }
+  .toggle-switch input:checked + .toggle-slider { background: var(--color-accent); }
+  .toggle-switch input:checked + .toggle-slider::before { transform: translateX(18px); }
+
+  /* scope radio */
+  .scope-options { display: flex; flex-direction: column; gap: 10px; }
+  .scope-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 16px;
+    border: 1.5px solid var(--color-border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: border-color .2s, background .2s;
+  }
+  .scope-option:hover { border-color: var(--color-accent); background: var(--color-accent-soft); }
+  .scope-option input[type="radio"] { margin-top: 3px; accent-color: var(--color-accent); }
+  .scope-option.selected { border-color: var(--color-accent); background: var(--color-accent-soft); }
+  .scope-option .scope-name { font-weight: 700; font-size: .9rem; }
+  .scope-option .scope-desc { font-size: .8rem; color: var(--color-text-secondary); margin-top: 2px; }
+
+  /* 頻道規則清單 */
+  .rule-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+  .rule-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 14px;
+    background: var(--color-bg-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    font-size: .875rem;
+  }
+  .rule-badge-allow { background: rgba(46,158,107,.15); color: var(--color-positive); padding: 2px 8px; border-radius: 4px; font-size: .72rem; font-weight: 700; }
+  .rule-badge-deny  { background: rgba(217,80,63,.15);  color: var(--color-negative); padding: 2px 8px; border-radius: 4px; font-size: .72rem; font-weight: 700; }
+  .btn-icon-del {
+    margin-left: auto;
+    background: transparent;
+    border: none;
+    color: var(--color-text-disabled);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 6px;
+    transition: color .15s, background .15s;
+  }
+  .btn-icon-del:hover { color: var(--color-negative); background: rgba(217,80,63,.1); }
+
+  /* 儲存按鈕列 */
+  .save-bar {
+    position: sticky;
+    bottom: 0;
+    background: var(--color-bg-elevated);
+    border-top: 1px solid var(--color-border);
+    padding: 14px 24px;
+    margin: 0 -32px -32px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    backdrop-filter: blur(12px);
+  }
+  .btn-save {
+    padding: 10px 24px;
+    background: #5865F2;
+    color: #fff;
+    border: none;
+    border-radius: var(--radius-pill);
+    font-weight: 700;
+    font-size: .9rem;
+    cursor: pointer;
+    transition: opacity .2s, transform .15s;
+  }
+  .btn-save:hover { opacity: .88; transform: translateY(-1px); }
+  .btn-save:disabled { opacity: .5; cursor: not-allowed; }
+  .save-msg { font-size: .85rem; color: var(--color-positive); display: none; }
+
+  /* 稽核記錄 */
+  .audit-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--color-border);
+    font-size: .85rem;
+  }
+  .audit-row:last-child { border-bottom: none; }
+  .audit-field { font-weight: 700; color: var(--color-accent); min-width: 120px; }
+  .audit-change { color: var(--color-text-secondary); }
+  .audit-time { margin-left: auto; color: var(--color-text-disabled); font-size: .78rem; white-space: nowrap; }
+
+  /* 同步提示 */
+  .cache-notice {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    background: rgba(88,101,242,.08);
+    border: 1px solid rgba(88,101,242,.25);
+    border-radius: var(--radius-md);
+    font-size: .85rem;
+    color: var(--color-text-secondary);
+    margin-bottom: 16px;
+  }
+
+  /* 響應式 */
+  @media (max-width: 768px) {
+    .manage-layout { flex-direction: column; }
+    .manage-sidebar {
+      width: 100%;
+      height: auto;
+      position: static;
+      flex-direction: row;
+      overflow-x: auto;
+    }
+    .sidebar-header { display: none; }
+    .sidebar-nav { display: flex; flex-direction: row; padding: 8px; }
+    .sidebar-section-title { display: none; }
+    .sidebar-item { flex-direction: column; gap: 3px; padding: 8px 10px; font-size: .72rem; min-width: 64px; text-align: center; }
+    .sidebar-back { border-top: none; border-left: 1px solid var(--color-border); padding: 8px; }
+    .manage-main { padding: 20px; }
+    .save-bar { margin: 0 -20px -20px; padding: 12px 20px; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="manage-layout">
+
+  <!-- ── 側邊欄 ──────────────────────────────────────────── -->
+  <aside class="manage-sidebar">
+    <div class="sidebar-header">
+      {% if guild.icon_hash %}
+        <img class="sidebar-guild-icon" src="{{ guild.icon_url }}" alt="{{ guild.name }}" />
+      {% else %}
+        <div class="sidebar-guild-icon">{{ guild.name|first|upper }}</div>
+      {% endif %}
+      <div>
+        <div class="sidebar-guild-name">{{ guild.name }}</div>
+        <div class="sidebar-guild-id">ID: {{ guild.guild_id }}</div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="sidebar-section-title">設定</div>
+      <button class="sidebar-item active" data-panel="overview" type="button">
+        <span class="icon">📊</span> 總覽
+      </button>
+      <button class="sidebar-item" data-panel="crawl" type="button">
+        <span class="icon">📡</span> 頻道讀取
+      </button>
+      <button class="sidebar-item" data-panel="news" type="button">
+        <span class="icon">📰</span> 推播設定
+      </button>
+      <button class="sidebar-item" data-panel="ai" type="button">
+        <span class="icon">🤖</span> AI 問答
+      </button>
+
+      <div class="sidebar-section-title">記錄</div>
+      <button class="sidebar-item" data-panel="stats" type="button">
+        <span class="icon">📈</span> 統計資料
+      </button>
+      <button class="sidebar-item" data-panel="audit" type="button">
+        <span class="icon">🔍</span> 變更記錄
+      </button>
+    </nav>
+
+    <div class="sidebar-back">
+      <a href="{% url 'app_uma_info_portal:servers' %}" class="sidebar-item" style="text-decoration:none;">
+        <span class="icon">←</span> 返回列表
+      </a>
+    </div>
+  </aside>
+
+  <!-- ── 主要內容 ────────────────────────────────────────── -->
+  <main class="manage-main">
+
+    <!-- ── 總覽面板 ──────────────────────────────────────── -->
+    <div class="panel active" id="panel-overview">
+      <div class="panel-header" style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
+        <div>
+          <h2>📊 {{ guild.name }} 總覽</h2>
+          <p>伺服器整體使用統計與快速狀態一覽</p>
+        </div>
+        <button type="button" class="btn-save" style="padding:6px 14px;font-size:.8rem;flex-shrink:0;"
+                onclick="refreshGuildStats(true)">↻ 更新統計</button>
+      </div>
+      <p id="statsRefreshedAt" style="font-size:.78rem;color:var(--color-text-disabled);margin:-8px 0 12px;">
+        統計時間：{{ stats.refreshed_at|default:"—" }}
+        {% if stats.last_message_at %} · 最新訊息 {{ stats.last_message_at }}{% endif %}
+      </p>
+
+      <div class="stat-cards">
+        <div class="stat-card">
+          <div class="val stat-val-msg">{{ stats.msg_count }}</div>
+          <div class="lbl">已收集訊息</div>
+        </div>
+        <div class="stat-card">
+          <div class="val stat-val-uma">{{ stats.uma_count }}</div>
+          <div class="lbl">賽馬娘相關</div>
+        </div>
+        <div class="stat-card">
+          <div class="val stat-val-news">{{ stats.news_count }}</div>
+          <div class="lbl">情報推播次數</div>
+        </div>
+        <div class="stat-card">
+          <div class="val stat-val-channels">{{ stats.channel_count }}</div>
+          <div class="lbl">已快取頻道</div>
+        </div>
+      </div>
+
+      <!-- 快速狀態 -->
+      <div class="setting-section">
+        <div class="setting-section-title">⚡ 快速狀態</div>
+        <div class="toggle-row">
+          <div>
+            <div class="toggle-label">Bot 在線狀態</div>
+            <div class="toggle-desc">Bot 目前是否已加入此伺服器</div>
+          </div>
+          <span class="badge" style="background:var(--color-positive);color:#fff;border-radius:var(--radius-pill);padding:4px 12px;font-size:.8rem;">
+            {% if guild.is_bot_present %}✓ 在線{% else %}✕ 離線{% endif %}
+          </span>
+        </div>
+        <div class="toggle-row">
+          <div>
+            <div class="toggle-label">情報推播</div>
+            <div class="toggle-desc">每日自動推播設定狀態</div>
+          </div>
+          <span class="badge" style="background:{% if setting.news_enabled %}var(--color-positive){% else %}var(--color-border){% endif %};color:{% if setting.news_enabled %}#fff{% else %}var(--color-text-secondary){% endif %};border-radius:var(--radius-pill);padding:4px 12px;font-size:.8rem;">
+            {% if setting.news_enabled %}啟用{% else %}停用{% endif %}
+          </span>
+        </div>
+        <div class="toggle-row">
+          <div>
+            <div class="toggle-label">AI 問答</div>
+            <div class="toggle-desc">@UMA Info 問答功能狀態</div>
+          </div>
+          <span class="badge" style="background:{% if setting.ai_chat_enabled %}var(--color-positive){% else %}var(--color-border){% endif %};color:{% if setting.ai_chat_enabled %}#fff{% else %}var(--color-text-secondary){% endif %};border-radius:var(--radius-pill);padding:4px 12px;font-size:.8rem;">
+            {% if setting.ai_chat_enabled %}啟用{% else %}停用{% endif %}
+          </span>
+        </div>
+        <div class="toggle-row">
+          <div>
+            <div class="toggle-label">頻道快取</div>
+            <div class="toggle-desc">Bot 同步的頻道清單</div>
+          </div>
+          <span style="color:var(--color-text-secondary);font-size:.85rem;">{{ channels|length }} 個頻道</span>
+        </div>
+      </div>
+
+      <!-- 快取同步按鈕 -->
+      <div class="cache-notice">
+        ℹ️ 如果下拉清單看不到最新頻道，可點擊「同步快取」更新
+        <button class="btn-save ms-auto" style="padding:6px 16px;font-size:.8rem;" onclick="syncCache()">同步快取</button>
+      </div>
+    </div>
+
+    <!-- ── 頻道讀取面板 ────────────────────────────────────── -->
+    <div class="panel" id="panel-crawl">
+      <div class="panel-header">
+        <h2>📡 頻道讀取設定</h2>
+        <p>設定 Bot 要從哪些頻道收集賽馬娘相關訊息</p>
+      </div>
+
+      <div class="setting-section">
+        <div class="setting-section-title">讀取範圍</div>
+        <div class="scope-options" id="scopeOptions">
+          {% for val, label in setting.get_read_scope_display|yesno:","|safe %}{% endfor %}
+
+          <label class="scope-option {% if setting.read_scope == 'all' %}selected{% endif %}">
+            <input type="radio" name="read_scope" value="all" {% if setting.read_scope == 'all' %}checked{% endif %} />
+            <div>
+              <div class="scope-name">🌐 全部頻道</div>
+              <div class="scope-desc">Bot 可讀取的所有文字頻道，自動過濾馬娘相關內容</div>
+            </div>
+          </label>
+
+          <label class="scope-option {% if setting.read_scope == 'announcements' %}selected{% endif %}">
+            <input type="radio" name="read_scope" value="announcements" {% if setting.read_scope == 'announcements' %}checked{% endif %} />
+            <div>
+              <div class="scope-name">📢 僅公告頻道</div>
+              <div class="scope-desc">只讀取 Discord 「公告頻道」類型（最低權限需求）</div>
+            </div>
+          </label>
+
+          <label class="scope-option {% if setting.read_scope == 'single' %}selected{% endif %}">
+            <input type="radio" name="read_scope" value="single" {% if setting.read_scope == 'single' %}checked{% endif %} />
+            <div>
+              <div class="scope-name">🎯 指定單一頻道</div>
+              <div class="scope-desc">只讀取下方指定的特定頻道</div>
+            </div>
+          </label>
+
+          <label class="scope-option {% if setting.read_scope == 'advanced' %}selected{% endif %}">
+            <input type="radio" name="read_scope" value="advanced" {% if setting.read_scope == 'advanced' %}checked{% endif %} />
+            <div>
+              <div class="scope-name">⚙️ 進階 Allow/Deny</div>
+              <div class="scope-desc">自訂允許或排除的頻道清單（精細控制）</div>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- 指定單一頻道（single 模式）-->
+      <div class="setting-section" id="singleChannelSection" style="display:{% if setting.read_scope == 'single' %}block{% else %}none{% endif %}">
+        <div class="setting-section-title">🎯 指定讀取頻道</div>
+        {% if not readable_channels %}
+          <div class="cache-notice" style="margin-bottom:0;">⚠️ 找不到 Bot 有讀取權限的頻道，請先確認 Bot 已加入且有頻道讀取權限，再點「同步快取」。</div>
+        {% else %}
+          <label class="form-label-sm">選擇頻道（僅列出 Bot 有讀取權限的頻道）</label>
+          <select class="form-select-custom" id="singleChannelId" name="single_channel_id">
+            <option value="">-- 選擇頻道 --</option>
+            {% for ch in readable_channels %}
+              {% if ch.channel_type != 'voice' %}
+                <option value="{{ ch.channel_id }}" {% if setting.single_channel_id == ch.channel_id %}selected{% endif %}>
+                  #{{ ch.channel_name }} ({{ ch.channel_type }})
+                </option>
+              {% endif %}
+            {% endfor %}
+          </select>
+        {% endif %}
+      </div>
+
+      <!-- 進階規則（advanced 模式）-->
+      <div class="setting-section" id="advancedRulesSection" style="display:{% if setting.read_scope == 'advanced' %}block{% else %}none{% endif %}">
+        <div class="setting-section-title">⚙️ 頻道規則清單</div>
+        <div class="rule-list" id="ruleList">
+          {% for rule in channel_rules %}
+            <div class="rule-item" data-rule-id="{{ rule.pk }}">
+              <span class="rule-badge-{{ rule.rule_type }}">{{ rule.get_rule_type_display }}</span>
+              <span>#{{ rule.channel_name|default:rule.channel_id }}</span>
+              <button class="btn-icon-del" onclick="deleteRule({{ rule.pk }}, this)" title="刪除規則">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+              </button>
+            </div>
+          {% empty %}
+            <p style="color:var(--color-text-disabled);font-size:.85rem;" id="noRulesMsg">尚未新增任何規則</p>
+          {% endfor %}
+        </div>
+        <!-- 新增規則表單（僅列有讀取權限的頻道）-->
+        <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
+          <div style="flex:1;min-width:160px;">
+            <label class="form-label-sm">頻道（Bot 有讀取權限）</label>
+            <select class="form-select-custom" id="newRuleChannel">
+              <option value="">-- 選擇頻道 --</option>
+              {% for ch in readable_channels %}
+                {% if ch.channel_type != 'voice' %}
+                  <option value="{{ ch.channel_id }}" data-name="{{ ch.channel_name }}">
+                    #{{ ch.channel_name }}
+                  </option>
+                {% endif %}
+              {% endfor %}
+            </select>
+          </div>
+          <div style="min-width:100px;">
+            <label class="form-label-sm">規則類型</label>
+            <select class="form-select-custom" id="newRuleType">
+              <option value="allow">允許</option>
+              <option value="deny">排除</option>
+            </select>
+          </div>
+          <button class="btn-save" style="padding:9px 16px;margin-bottom:0;" onclick="addRule()">+ 新增</button>
+        </div>
+      </div>
+
+      <div class="save-bar">
+        <button class="btn-save" id="saveCrawlBtn" onclick="saveCrawlSettings()">儲存讀取設定</button>
+        <span class="save-msg" id="crawlSaveMsg">✓ 已儲存</span>
+      </div>
+    </div>
+
+    <!-- ── 推播設定面板 ────────────────────────────────────── -->
+    <div class="panel" id="panel-news">
+      <div class="panel-header">
+        <h2>📰 情報推播設定</h2>
+        <p>設定賽馬娘情報摘要的推播目標頻道與語氣；推播時程請至後台控制台統一管理</p>
+      </div>
+
+      <div class="cache-notice" style="margin-bottom:20px;">
+        📅 推播時程（頻率 / 時間）由管理員後台統一控制，此處僅設定頻道與語氣。
+      </div>
+
+      <div class="setting-section">
+        <div class="setting-section-title">推播開關</div>
+        <div class="toggle-row">
+          <div>
+            <div class="toggle-label">啟用情報推播</div>
+            <div class="toggle-desc">啟用後 Bot 將依後台排程推送情報摘要至指定頻道</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="newsEnabled" {% if setting.news_enabled %}checked{% endif %} />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="setting-section">
+        <div class="setting-section-title">推播目標</div>
+        {% if not sendable_channels %}
+          <div class="cache-notice" style="margin-bottom:12px;">⚠️ 找不到 Bot 有發訊息權限的頻道，請確認 Bot 擁有「傳送訊息」及「嵌入連結」權限後點「同步快取」。</div>
+        {% endif %}
+        <div class="row g-3">
+          <div class="col-12 col-md-6">
+            <label class="form-label-sm">推播頻道（僅列 Bot 有發訊息權限的頻道）</label>
+            <select class="form-select-custom" id="newsChannelId">
+              <option value="">-- 不設定（停用）--</option>
+              {% for ch in sendable_channels %}
+                {% if ch.channel_type == 'text' or ch.channel_type == 'news' %}
+                  <option value="{{ ch.channel_id }}" {% if setting.news_channel_id == ch.channel_id %}selected{% endif %}>
+                    #{{ ch.channel_name }} ({{ ch.channel_type }})
+                  </option>
+                {% endif %}
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label-sm">Ping 身分組（可選）</label>
+            <select class="form-select-custom" id="pingRoleId">
+              <option value="">-- 不 Ping 任何身分組 --</option>
+              {% for role in roles %}
+                <option value="{{ role.role_id }}" {% if setting.ping_role_id == role.role_id %}selected{% endif %}>
+                  @{{ role.role_name }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- 確認訊息狀態提示 -->
+      <div id="newsConfirmBanner" style="display:none;padding:10px 14px;border-radius:8px;font-size:.85rem;margin-bottom:16px;"></div>
+
+      <div class="setting-section">
+        <div class="setting-section-title">摘要語氣</div>
+        <div class="scope-options">
+          <label class="scope-option {% if setting.news_tone == 'lively' %}selected{% endif %}">
+            <input type="radio" name="news_tone" value="lively" {% if setting.news_tone == 'lively' %}checked{% endif %} />
+            <div>
+              <div class="scope-name">🎉 活潑（社群向）</div>
+              <div class="scope-desc">加入 Emoji、口語化措辭，適合輕鬆的社群伺服器</div>
+            </div>
+          </label>
+          <label class="scope-option {% if setting.news_tone == 'concise' %}selected{% endif %}">
+            <input type="radio" name="news_tone" value="concise" {% if setting.news_tone == 'concise' %}checked{% endif %} />
+            <div>
+              <div class="scope-name">📋 簡潔（資訊向）</div>
+              <div class="scope-desc">純文字條列，快速掌握重點，適合資訊分享型伺服器</div>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <div class="save-bar">
+        <button class="btn-save" id="saveNewsBtn" onclick="saveNewsSettings()">儲存推播設定</button>
+        <span class="save-msg" id="newsSaveMsg">✓ 已儲存</span>
+      </div>
+    </div>
+
+    <!-- ── AI 問答面板 ─────────────────────────────────────── -->
+    <div class="panel" id="panel-ai">
+      <div class="panel-header">
+        <h2>🤖 AI 問答設定</h2>
+        <p>設定 @UMA Info 智能問答功能的行為與用量限制</p>
+      </div>
+
+      <div class="setting-section">
+        <div class="setting-section-title">問答開關</div>
+        <div class="toggle-row">
+          <div>
+            <div class="toggle-label">啟用 @UMA Info 問答</div>
+            <div class="toggle-desc">成員可在任何頻道 @ 提及 Bot 進行問答</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="aiChatEnabled" {% if setting.ai_chat_enabled %}checked{% endif %} />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="setting-section">
+        <div class="setting-section-title">用量限制</div>
+        <label class="form-label-sm">每日問答上限（全伺服器合計，0 = 無限制）</label>
+        <input type="number" class="form-input-custom" id="aiDailyQuota" value="{{ setting.ai_daily_quota }}" min="0" max="10000" style="max-width:200px;" />
+        <p style="font-size:.78rem;color:var(--color-text-secondary);margin-top:6px;">建議設定 50–200，防止用量暴衝</p>
+      </div>
+
+      <div class="setting-section">
+        <div class="setting-section-title">💡 使用方式</div>
+        <p style="font-size:.9rem;color:var(--color-text-secondary);margin:0;">
+          在任何頻道輸入 <code style="background:var(--color-accent-soft);padding:2px 6px;border-radius:4px;color:var(--color-accent);">@UMA Info 你的問題</code> 即可提問；亦可<strong>附上圖片</strong>（截圖、公告、育成面板等）請 Bot 分析。<br>
+          <br>
+          回答語言：<strong>繁體中文</strong><br>
+          AI 模型：<strong>{{ ai_chat_model_label }}</strong>（成本最低）
+        </p>
+      </div>
+
+      <div class="save-bar">
+        <button class="btn-save" id="saveAiBtn" onclick="saveAiSettings()">儲存 AI 設定</button>
+        <span class="save-msg" id="aiSaveMsg">✓ 已儲存</span>
+      </div>
+    </div>
+
+    <!-- ── 統計面板 ─────────────────────────────────────────── -->
+    <div class="panel" id="panel-stats">
+      <div class="panel-header" style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
+        <div>
+          <h2>📈 統計資料</h2>
+          <p>Bot 在此伺服器的收集與推播統計</p>
+        </div>
+        <button type="button" class="btn-save" style="padding:6px 14px;font-size:.8rem;flex-shrink:0;"
+                onclick="refreshGuildStats(true)">↻ 更新統計</button>
+      </div>
+      <div class="stat-cards">
+        <div class="stat-card">
+          <div class="val stat-val-msg">{{ stats.msg_count }}</div>
+          <div class="lbl">總收集訊息</div>
+        </div>
+        <div class="stat-card">
+          <div class="val stat-val-uma">{{ stats.uma_count }}</div>
+          <div class="lbl">賽馬娘相關</div>
+        </div>
+        <div class="stat-card">
+          <div class="val stat-val-pending">{{ stats.pending_count }}</div>
+          <div class="lbl">待分類</div>
+        </div>
+        <div class="stat-card">
+          <div class="val stat-val-news">{{ stats.news_count }}</div>
+          <div class="lbl">情報推播次數</div>
+        </div>
+        <div class="stat-card">
+          <div class="val stat-val-pct">{% if stats.msg_count > 0 %}{{ stats.uma_pct }}%{% else %}—{% endif %}</div>
+          <div class="lbl">相關訊息比例</div>
+        </div>
+        <div class="stat-card">
+          <div class="val stat-val-converted">{{ stats.converted_count }}</div>
+          <div class="lbl">已轉 NewsData</div>
+        </div>
+      </div>
+      <div class="setting-section">
+        <div class="setting-section-title">伺服器資訊</div>
+        <div class="toggle-row">
+          <span style="color:var(--color-text-secondary);">伺服器 ID</span>
+          <code style="font-size:.85rem;color:var(--color-text-primary);">{{ guild.guild_id }}</code>
+        </div>
+        <div class="toggle-row">
+          <span style="color:var(--color-text-secondary);">成員數</span>
+          <span>{{ guild.member_count }}</span>
+        </div>
+        <div class="toggle-row">
+          <span style="color:var(--color-text-secondary);">Bot 加入時間</span>
+          <span>{{ guild.joined_at|date:"Y-m-d H:i"|default:"—" }}</span>
+        </div>
+        <div class="toggle-row">
+          <span style="color:var(--color-text-secondary);">讀取範圍</span>
+          <span>{{ setting.get_read_scope_display }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 變更記錄面板 ───────────────────────────────────────── -->
+    <div class="panel" id="panel-audit">
+      <div class="panel-header">
+        <h2>🔍 設定變更記錄</h2>
+        <p>追蹤此伺服器的所有設定變更歷史</p>
+      </div>
+      <div class="setting-section">
+        {% if audits %}
+          {% for audit in audits %}
+            <div class="audit-row">
+              <div class="audit-field">{{ audit.field_name }}</div>
+              <div class="audit-change">
+                <span style="color:var(--color-negative);">{{ audit.old_value|default:"（空）" }}</span>
+                → <span style="color:var(--color-positive);">{{ audit.new_value|default:"（空）" }}</span>
+                <span style="color:var(--color-text-disabled);font-size:.78rem;"> by {{ audit.changed_by }}</span>
+              </div>
+              <div class="audit-time">{{ audit.changed_at|date:"m-d H:i" }}</div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <p style="color:var(--color-text-disabled);font-size:.9rem;text-align:center;padding:24px 0;">尚無變更記錄</p>
+        {% endif %}
+      </div>
+    </div>
+
+  </main>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  const GUILD_ID = '{{ guild.guild_id }}';
+  const csrfToken = '{{ csrf_token }}';
+
+  // ── 側邊欄切換 ──────────────────────────────────────────
+  document.querySelectorAll('.sidebar-item[data-panel]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.sidebar-item[data-panel]').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('panel-' + btn.dataset.panel).classList.add('active');
+    });
+  });
+
+  // ── 讀取範圍選項視覺 ─────────────────────────────────────
+  document.querySelectorAll('input[name="read_scope"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      document.querySelectorAll('.scope-option').forEach(o => o.classList.remove('selected'));
+      radio.closest('.scope-option').classList.add('selected');
+      document.getElementById('singleChannelSection').style.display = radio.value === 'single' ? 'block' : 'none';
+      document.getElementById('advancedRulesSection').style.display = radio.value === 'advanced' ? 'block' : 'none';
+    });
+  });
+
+  document.querySelectorAll('input[name="news_tone"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      document.querySelectorAll('.scope-options .scope-option').forEach(o => o.classList.remove('selected'));
+      radio.closest('.scope-option').classList.add('selected');
+    });
+  });
+
+  // ── 通用儲存 ─────────────────────────────────────────────
+  async function saveSettings(payload, btnId, msgId) {
+    const btn = document.getElementById(btnId);
+    const msg = document.getElementById(msgId);
+    btn.disabled = true;
+    btn.textContent = '儲存中…';
+    try {
+      const resp = await fetch(`/uma-info/api/guilds/${GUILD_ID}/settings/save/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+        body: JSON.stringify(payload),
+      });
+      const data = await resp.json();
+      if (resp.ok) {
+        msg.style.display = 'inline';
+        setTimeout(() => { msg.style.display = 'none'; }, 3000);
+      } else {
+        alert('儲存失敗：' + (data.error || '未知錯誤'));
+      }
+    } catch(e) {
+      alert('網路錯誤，請重試');
+    }
+    btn.disabled = false;
+    btn.textContent = '儲存' + btnId.replace('save','').replace('Btn','') + '設定';
+  }
+
+  function saveCrawlSettings() {
+    const scope = document.querySelector('input[name="read_scope"]:checked')?.value || 'all';
+    const payload = {
+      read_scope: scope,
+      single_channel_id: scope === 'single' ? document.getElementById('singleChannelId').value : '',
+    };
+    document.getElementById('saveCrawlBtn').textContent = '儲存讀取設定';
+    saveSettings(payload, 'saveCrawlBtn', 'crawlSaveMsg');
+  }
+
+  async function saveNewsSettings() {
+    const newChannel = document.getElementById('newsChannelId').value;
+    const payload = {
+      news_enabled:    document.getElementById('newsEnabled').checked,
+      news_channel_id: newChannel,
+      ping_role_id:    document.getElementById('pingRoleId').value,
+      news_tone:       document.querySelector('input[name="news_tone"]:checked')?.value || 'lively',
+    };
+    const btn = document.getElementById('saveNewsBtn');
+    const msg = document.getElementById('newsSaveMsg');
+    btn.disabled = true;
+    btn.textContent = '儲存中…';
+    try {
+      const resp = await fetch(`/uma-info/api/guilds/${GUILD_ID}/settings/save/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+        body: JSON.stringify(payload),
+      });
+      const data = await resp.json();
+      if (resp.ok) {
+        msg.style.display = 'inline';
+        setTimeout(() => { msg.style.display = 'none'; }, 3000);
+        // 只要有設定推播頻道，每次儲存都讓 Bot 發確認 Embed
+        if (newChannel) {
+          _sendNewsChannelConfirm();
+        }
+      } else {
+        alert('儲存失敗：' + (data.error || '未知錯誤'));
+      }
+    } catch(e) {
+      alert('網路錯誤，請重試');
+    }
+    btn.disabled = false;
+    btn.textContent = '儲存推播設定';
+  }
+
+  async function _sendNewsChannelConfirm() {
+    const banner = document.getElementById('newsConfirmBanner');
+    try {
+      const resp = await fetch(`/uma-info/api/guilds/${GUILD_ID}/confirm-news-channel/`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrfToken },
+      });
+      const data = await resp.json();
+      if (data.status === 'sent') {
+        banner.style.display = 'block';
+        banner.style.background = 'rgba(46,158,107,.12)';
+        banner.style.border = '1px solid rgba(46,158,107,.35)';
+        banner.style.color = 'var(--color-positive)';
+        banner.textContent = '✅ Bot 已向推播頻道發送確認訊息';
+      } else {
+        banner.style.display = 'block';
+        banner.style.background = 'rgba(250,173,20,.12)';
+        banner.style.border = '1px solid rgba(250,173,20,.35)';
+        banner.style.color = '#c78d00';
+        banner.textContent = '⚠️ ' + (data.reason || '確認訊息發送失敗，請確認 Bot Token 及頻道權限');
+      }
+      setTimeout(() => { banner.style.display = 'none'; }, 6000);
+    } catch (_) {}
+  }
+
+  function saveAiSettings() {
+    const payload = {
+      ai_chat_enabled: document.getElementById('aiChatEnabled').checked,
+      ai_daily_quota:  parseInt(document.getElementById('aiDailyQuota').value) || 100,
+    };
+    saveSettings(payload, 'saveAiBtn', 'aiSaveMsg');
+  }
+
+  // ── 頻道規則 ─────────────────────────────────────────────
+  async function addRule() {
+    const sel  = document.getElementById('newRuleChannel');
+    const type = document.getElementById('newRuleType').value;
+    const cid  = sel.value;
+    const cname = sel.options[sel.selectedIndex]?.dataset.name || cid;
+    if (!cid) return alert('請選擇頻道');
+
+    const resp = await fetch(`/uma-info/api/guilds/${GUILD_ID}/rules/add/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+      body: JSON.stringify({ channel_id: cid, channel_name: cname, rule_type: type }),
+    });
+    const data = await resp.json();
+    if (resp.ok) {
+      const list = document.getElementById('ruleList');
+      const noMsg = document.getElementById('noRulesMsg');
+      if (noMsg) noMsg.remove();
+      const div = document.createElement('div');
+      div.className = 'rule-item';
+      div.dataset.ruleId = data.id;
+      div.innerHTML = `
+        <span class="rule-badge-${type}">${type === 'allow' ? '允許' : '排除'}</span>
+        <span>#${cname}</span>
+        <button class="btn-icon-del" onclick="deleteRule(${data.id}, this)" title="刪除規則">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>`;
+      list.appendChild(div);
+      sel.value = '';
+    } else {
+      alert('新增失敗：' + (data.error || '未知錯誤'));
+    }
+  }
+
+  async function deleteRule(pk, btn) {
+    if (!confirm('確定要刪除此頻道規則？')) return;
+    const resp = await fetch(`/uma-info/api/guilds/${GUILD_ID}/rules/${pk}/delete/`, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': csrfToken },
+    });
+    if (resp.ok) {
+      btn.closest('.rule-item').remove();
+    } else {
+      alert('刪除失敗，請重試');
+    }
+  }
+
+  // ── 同步快取 ──────────────────────────────────────────────
+  async function syncCache() {
+    const resp = await fetch(`/uma-info/api/guilds/${GUILD_ID}/sync-cache/`, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': csrfToken },
+    });
+    const data = await resp.json();
+    alert(data.status === 'triggered' ? '✓ 已觸發同步，請稍後重新整理頁面' : '已排程，Bot 重啟後執行');
+  }
+
+  // ── 伺服器統計即時刷新 ──────────────────────────────────────
+  const STATS_URL = '{% url "app_uma_info_portal:api_guild_stats" guild_id=guild.guild_id %}';
+  let _statsTimer = null;
+
+  function _applyGuildStats(s) {
+    document.querySelectorAll('.stat-val-msg').forEach(el => { el.textContent = s.msg_count; });
+    document.querySelectorAll('.stat-val-uma').forEach(el => { el.textContent = s.uma_count; });
+    document.querySelectorAll('.stat-val-news').forEach(el => { el.textContent = s.news_count; });
+    document.querySelectorAll('.stat-val-channels').forEach(el => { el.textContent = s.channel_count; });
+    document.querySelectorAll('.stat-val-pending').forEach(el => { el.textContent = s.pending_count; });
+    document.querySelectorAll('.stat-val-converted').forEach(el => {
+      el.textContent = s.converted_count;
+    });
+    document.querySelectorAll('.stat-val-pct').forEach(el => {
+      el.textContent = s.msg_count > 0 ? `${s.uma_pct}%` : '—';
+    });
+    const meta = document.getElementById('statsRefreshedAt');
+    if (meta) {
+      let txt = `統計時間：${s.refreshed_at || '—'}`;
+      if (s.last_message_at) txt += ` · 最新訊息 ${s.last_message_at}`;
+      meta.textContent = txt;
+    }
+  }
+
+  async function refreshGuildStats(showToast) {
+    try {
+      const resp = await fetch(STATS_URL);
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+      _applyGuildStats(data.stats);
+      if (showToast) {
+        const hint = data.stats.msg_count > 0
+          ? `已更新：${data.stats.msg_count} 則訊息`
+          : '已更新（此伺服器尚無收集訊息）';
+        const el = document.createElement('div');
+        el.textContent = hint;
+        el.style.cssText = 'position:fixed;bottom:24px;right:24px;background:var(--color-accent);color:#fff;padding:10px 16px;border-radius:8px;font-size:.85rem;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.15);';
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), 2500);
+      }
+    } catch (e) {
+      if (showToast) alert('統計更新失敗：' + e.message);
+    }
+  }
+
+  function _startStatsPolling() {
+    if (_statsTimer) clearInterval(_statsTimer);
+    _statsTimer = setInterval(() => refreshGuildStats(false), 30000);
+  }
+
+  // 切換至總覽 / 統計分頁時立即刷新
+  document.querySelectorAll('.sidebar-item[data-panel]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (['overview', 'stats'].includes(btn.dataset.panel)) {
+        refreshGuildStats(false);
+      }
+    });
+  });
+
+  refreshGuildStats(false);
+  _startStatsPolling();
+
+</script>
+{% endblock %}

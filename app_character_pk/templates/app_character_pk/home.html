@@ -1,0 +1,819 @@
+{% extends 'base.html' %}
+{% block title %}賽馬娘資訊平台{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* ─────────────────────────────────────────────────────
+     AI News card — 上下版型（封面橫幅 + 全寬正文）
+     ───────────────────────────────────────────────────── */
+  .ai-news-hero {
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-surface);
+    backdrop-filter: blur(16px) saturate(140%);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
+    box-shadow: 0 8px 32px var(--color-shadow-md);
+    transition: box-shadow 0.3s ease;
+  }
+  .ai-news-hero:hover {
+    box-shadow: 0 16px 48px var(--color-shadow-lg);
+  }
+  .ai-news-hero .card-header {
+    background: linear-gradient(135deg,
+      color-mix(in srgb, var(--color-accent) 12%, transparent),
+      color-mix(in srgb, var(--color-gold) 8%, transparent)
+    );
+    border-bottom: 1px solid var(--color-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1.2rem;
+  }
+  .ai-news-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 4px 12px;
+    border-radius: var(--radius-pill);
+    font-size: 0.78rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--color-accent), color-mix(in srgb, var(--color-gold) 60%, var(--color-accent)));
+    color: #fff;
+    letter-spacing: 0.03em;
+  }
+
+  /* ── 封面橫幅：圖片自然高度（不裁切），caption 疊於圖片下方 ── */
+  .ai-news-banner {
+    width: 100%;
+    display: none;          /* JS 控制顯示 */
+    overflow: hidden;
+    /* 圖片載入前的佔位背景 */
+    background: linear-gradient(135deg,
+      color-mix(in srgb, var(--color-accent) 22%, var(--color-bg-base)),
+      color-mix(in srgb, var(--color-gold)   14%, var(--color-bg-base))
+    );
+  }
+
+  /* 圖片：width:100% + height:auto 保持原始比例，不裁切任何部分 */
+  .ai-news-banner img {
+    width: 100%;
+    height: auto;
+    display: block;
+    /* 極寬螢幕時防止圖片過高 */
+    max-height: 640px;
+    object-fit: cover;
+  }
+
+  /* 遮罩層已不需要（caption 改至圖下方），保留空規則避免 JS 參照出錯 */
+  .ai-news-banner-overlay { display: none; }
+
+  /* ── caption：圖片下方，右至左漸層背景（往左越淡） ── */
+  .ai-news-banner-caption {
+    /* 不再 absolute，改為普通區塊緊接在 img 之後 */
+    position: static;
+    width: 100%;
+    padding: 0.85rem 1.5rem 1rem;
+    border-bottom: 1px solid var(--color-border);
+    /* 深色主題：右側帶紫/金色調，往左漸褪至表面色 */
+    background: linear-gradient(
+      to left,
+      color-mix(in srgb, var(--color-accent) 20%, color-mix(in srgb, var(--color-gold) 12%, var(--color-bg-elevated))) 0%,
+      color-mix(in srgb, var(--color-accent)  8%, var(--color-bg-elevated)) 40%,
+      var(--color-bg-elevated) 75%
+    );
+    color: var(--color-text-primary);
+  }
+  /* 亮色主題：右側淺紫/金，往左漸褪至同樣淺色 */
+  [data-theme="light"] .ai-news-banner-caption {
+    background: linear-gradient(
+      to left,
+      color-mix(in srgb, var(--color-accent) 14%, color-mix(in srgb, var(--color-gold) 8%, var(--color-bg-elevated))) 0%,
+      color-mix(in srgb, var(--color-accent)  4%, var(--color-bg-elevated)) 45%,
+      var(--color-bg-elevated) 80%
+    );
+    color: var(--color-text-primary);
+  }
+
+  .ai-news-banner-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.4rem;
+    font-size: 0.78rem;
+  }
+  .news-tag {
+    display: inline-block;
+    padding: 2px 9px;
+    border-radius: var(--radius-pill);
+    background: color-mix(in srgb, var(--color-accent) 18%, var(--color-accent-soft));
+    color: var(--color-accent);
+    font-weight: 700;
+    font-size: 0.72rem;
+    letter-spacing: 0.03em;
+    border: 1px solid color-mix(in srgb, var(--color-accent) 25%, transparent);
+  }
+  .ai-news-banner-date {
+    font-size: 0.78rem;
+    color: var(--color-text-secondary);
+  }
+  .ai-news-banner-title {
+    font-size: 1.25rem;
+    font-weight: 800;
+    line-height: 1.45;
+    margin: 0;
+    color: var(--color-text-primary);
+    text-shadow: none;
+  }
+
+  /* 無封面圖時的純色 banner */
+  .ai-news-banner-placeholder {
+    width: 100%;
+    padding: 1.5rem 1.4rem;
+    background: linear-gradient(135deg,
+      color-mix(in srgb, var(--color-accent) 18%, var(--color-bg-elevated)),
+      color-mix(in srgb, var(--color-gold) 10%, var(--color-bg-elevated))
+    );
+    border-bottom: 1px solid var(--color-border);
+    display: none; /* JS 控制顯示 */
+  }
+  .ai-news-banner-placeholder .ai-news-headline {
+    font-size: 1.3rem;
+    font-weight: 800;
+    color: var(--color-text-primary);
+    margin: 0;
+    line-height: 1.45;
+  }
+  .ai-news-banner-placeholder .meta-line {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.5rem;
+    font-size: 0.8rem;
+    color: var(--color-text-secondary);
+  }
+
+  /* ── 正文區塊（圖下方全寬） ── */
+  .ai-news-body {
+    padding: 1.1rem 1.4rem;
+  }
+  .ai-news-subtitle {
+    font-size: 1rem;
+    color: var(--color-text-secondary);
+    margin: 0 0 0.8rem;
+    line-height: 1.55;
+  }
+  .ai-news-summary {
+    color: var(--color-text-secondary);
+    line-height: 1.8;
+    margin: 0 0 0.75rem;
+    font-size: 0.92rem;
+    font-style: italic;
+    padding-left: 0.9rem;
+    border-left: 3px solid var(--color-accent);
+  }
+  .ai-news-content {
+    color: var(--color-text-primary);
+    line-height: 1.9;
+    margin: 0;
+    white-space: pre-line;
+    font-size: 0.93rem;
+  }
+
+  /* ── 參考來源（底部橫排） ── */
+  .ai-news-refs {
+    margin-top: 1rem;
+    padding: 0.75rem 1.4rem 1.1rem;
+    border-top: 1px solid var(--color-border);
+    background: color-mix(in srgb, var(--color-accent-soft) 40%, transparent);
+  }
+  .ai-news-refs h6 {
+    font-size: 0.75rem;
+    color: var(--color-text-secondary);
+    font-weight: 700;
+    margin-bottom: 0.4rem;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+  }
+  .ai-news-ref-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1.2rem;
+    font-size: 0.82rem;
+  }
+  .ai-news-ref-list li {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    color: var(--color-text-secondary);
+  }
+  .ai-news-ref-list li::before {
+    content: '↗';
+    color: var(--color-accent);
+    font-size: 0.8rem;
+  }
+  .ai-news-ref-list a { color: var(--color-accent); text-decoration: none; }
+  .ai-news-ref-list a:hover { text-decoration: underline; }
+
+  /* 舊 meta（正文區如需用到） */
+  .ai-news-meta-inline {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.5rem;
+    font-size: 0.8rem;
+    color: var(--color-text-secondary);
+  }
+
+  /* ─────────────────────────────────────────────────────
+     Platform introduction section
+     ───────────────────────────────────────────────────── */
+  .intro-section {
+    padding: 2.5rem 0 1rem;
+  }
+  .intro-eyebrow {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--color-accent);
+    margin-bottom: 0.5rem;
+  }
+  .intro-heading {
+    font-size: 1.75rem;
+    font-weight: 800;
+    line-height: 1.35;
+    color: var(--color-text-primary);
+    margin-bottom: 0.6rem;
+  }
+  .intro-heading span {
+    background: linear-gradient(135deg, var(--color-accent), var(--color-gold));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .intro-lead {
+    font-size: 1.02rem;
+    color: var(--color-text-secondary);
+    line-height: 1.8;
+    max-width: 640px;
+    margin-bottom: 1.8rem;
+  }
+
+  /* Stats strip */
+  .stats-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+  .stat-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem 1.1rem;
+    border-radius: var(--radius-pill);
+    background: var(--color-bg-surface);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--color-border);
+    box-shadow: 0 2px 8px var(--color-shadow-sm);
+    font-size: 0.88rem;
+    color: var(--color-text-primary);
+    font-weight: 600;
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+  }
+  .stat-pill:hover {
+    box-shadow: 0 6px 20px var(--color-shadow-md), 0 0 0 2px color-mix(in srgb, var(--color-accent) 25%, transparent);
+    transform: translateY(-2px);
+  }
+  .stat-pill .stat-num {
+    font-size: 1.15rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--color-accent), var(--color-gold));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    min-width: 1.6rem;
+    text-align: center;
+  }
+  .stat-pill .stat-label {
+    color: var(--color-text-secondary);
+    font-weight: 500;
+    font-size: 0.82rem;
+  }
+
+  /* Feature cards grid */
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  @media (max-width: 992px) {
+    .features-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 576px) {
+    .features-grid { grid-template-columns: 1fr; }
+  }
+
+  .feature-card {
+    position: relative;
+    background: var(--color-bg-surface);
+    backdrop-filter: blur(16px) saturate(140%);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: 1.3rem 1.2rem;
+    text-decoration: none;
+    color: inherit;
+    display: block;
+    transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+    box-shadow: 0 2px 12px var(--color-shadow-sm);
+    overflow: hidden;
+  }
+  .feature-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--color-accent), var(--color-gold));
+    opacity: 0;
+    transition: opacity 0.22s ease;
+  }
+  .feature-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 32px var(--color-shadow-md), 0 0 0 1px var(--color-accent);
+    border-color: var(--color-accent);
+    text-decoration: none;
+    color: inherit;
+  }
+  .feature-card:hover::before { opacity: 1; }
+
+  .feature-icon {
+    width: 42px; height: 42px;
+    border-radius: var(--radius-sm);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.35rem;
+    margin-bottom: 0.8rem;
+    background: linear-gradient(135deg,
+      color-mix(in srgb, var(--color-accent) 18%, transparent),
+      color-mix(in srgb, var(--color-gold) 12%, transparent)
+    );
+    border: 1px solid color-mix(in srgb, var(--color-accent) 25%, transparent);
+  }
+  .feature-card h6 {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--color-text-primary);
+    margin-bottom: 0.3rem;
+  }
+  .feature-card p {
+    font-size: 0.83rem;
+    color: var(--color-text-secondary);
+    line-height: 1.6;
+    margin: 0;
+  }
+  .feature-arrow {
+    position: absolute;
+    top: 1.1rem; right: 1.1rem;
+    color: var(--color-accent);
+    font-size: 0.9rem;
+    opacity: 0;
+    transform: translateX(-4px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+  }
+  .feature-card:hover .feature-arrow {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  /* Data sources visual */
+  .sources-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin-bottom: 1rem;
+  }
+  .source-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 5px 13px;
+    border-radius: var(--radius-pill);
+    font-size: 0.8rem;
+    font-weight: 600;
+    background: var(--color-bg-elevated);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-secondary);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: border-color 0.18s ease, color 0.18s ease;
+  }
+  .source-chip:hover {
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+  }
+  .source-chip .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--color-accent);
+    flex-shrink: 0;
+  }
+  .source-chip .dot.gold { background: var(--color-gold); }
+  .source-chip .dot.green { background: var(--color-positive); }
+  .source-chip .dot.red { background: var(--color-negative); }
+
+  /* AI banner */
+  .ai-banner {
+    position: relative;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    padding: 2rem 1.8rem;
+    background: var(--color-bg-surface);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--color-border);
+    box-shadow: 0 8px 32px var(--color-shadow-sm);
+    margin-bottom: 1.5rem;
+  }
+  .ai-banner::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(135deg,
+      color-mix(in srgb, var(--color-accent) 8%, transparent) 0%,
+      color-mix(in srgb, var(--color-gold) 6%, transparent) 50%,
+      color-mix(in srgb, var(--color-accent) 4%, transparent) 100%
+    );
+    pointer-events: none;
+  }
+  .ai-banner-body { position: relative; }
+  .ai-banner h5 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: 0.35rem;
+    color: var(--color-text-primary);
+  }
+  .ai-banner p {
+    font-size: 0.9rem;
+    color: var(--color-text-secondary);
+    margin-bottom: 1rem;
+    line-height: 1.7;
+  }
+  .ai-banner-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+  }
+  .ai-banner-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 7px 16px;
+    border-radius: var(--radius-pill);
+    font-size: 0.84rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    border: 1px solid var(--color-border);
+    color: var(--color-text-primary);
+    background: var(--color-bg-elevated);
+  }
+  .ai-banner-link:hover {
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+    background: var(--color-accent-soft);
+    transform: translateY(-1px);
+    text-decoration: none;
+  }
+  .ai-banner-link.primary {
+    background: var(--color-accent);
+    color: #fff;
+    border-color: var(--color-accent);
+  }
+  .ai-banner-link.primary:hover {
+    opacity: 0.88;
+    color: #fff;
+    background: var(--color-accent);
+  }
+
+  /* Section divider */
+  .section-divider {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin: 2rem 0 1.2rem;
+    color: var(--color-text-secondary);
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .section-divider::before,
+  .section-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--color-border);
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- ═══════════════════════════════════════════════════════════
+     平台簡介區域（頂部）
+     ═══════════════════════════════════════════════════════════ -->
+<div class="col-lg-12 intro-section">
+
+  <!-- Eyebrow + heading + lead -->
+  <div class="intro-eyebrow">Uma Musume Analytics Platform</div>
+  <h2 class="intro-heading">解讀<span>賽馬娘</span>社群情報，<br>數據驅動的粉絲洞察</h2>
+  <p class="intro-lead">
+    整合 Bilibili BWIKI、巴哈姆特、ETtoday、UDN、宅宅新聞五大資料來源，
+    以 AI 驅動的情感分析與聲量追蹤，讓你深入了解每位角色的社群熱度與口碑動態。
+  </p>
+
+  <!-- Stats strip -->
+  <div class="stats-strip">
+    <div class="stat-pill">
+      <span class="stat-num">5+</span>
+      <span class="stat-label">資料來源</span>
+    </div>
+    <div class="stat-pill">
+      <span class="stat-num">1000+</span>
+      <span class="stat-label">公告數據</span>
+    </div>
+    <div class="stat-pill">
+      <span class="stat-num">AI</span>
+      <span class="stat-label">Gemini / Claude 雙引擎</span>
+    </div>
+    <div class="stat-pill">
+      <span class="stat-num">即時</span>
+      <span class="stat-label">情感趨勢追蹤</span>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     AI 生成新聞精選（簡介區之後）
+     ═══════════════════════════════════════════════════════════ -->
+<div class="col-lg-12 mb-3">
+  <div class="card ai-news-hero">
+    <div class="card-header">
+      <h5 class="mb-0" style="font-size:1rem;font-weight:700;">AI 生成新聞精選</h5>
+      <div style="display:flex;align-items:center;gap:0.7rem;">
+        <span id="aiNewsStatusText" class="text-muted" style="font-size:0.78rem;">載入中…</span>
+        <span class="ai-news-badge">AI 編輯室</span>
+      </div>
+    </div>
+    <!-- 載入中 -->
+    <div id="aiNewsLoading" class="text-center py-4 text-muted" style="font-size:0.9rem;">正在整理最新新聞…</div>
+    <div id="aiNewsError" class="alert alert-warning m-3" style="display:none;">新聞資料讀取失敗，請稍後再試。</div>
+    <div id="aiNewsEmpty" class="text-center py-4 text-muted" style="display:none;font-size:0.9rem;">
+      尚未發布 AI 新聞，請到後台「AI 新聞管理」產生內容。
+    </div>
+
+    <!-- 主體（JS 控制顯示） -->
+    <div id="aiNewsMain" style="display:none;">
+
+      <!-- 封面橫幅（有圖時顯示；img 自然高度不裁切，caption 緊接在圖下方） -->
+      <div id="aiNewsBanner" class="ai-news-banner">
+        <img id="aiNewsCoverImg" alt="AI 新聞封面" />
+        <!-- caption 疊在 img 下方，右至左漸層背景 -->
+        <div class="ai-news-banner-caption">
+          <div class="ai-news-banner-meta">
+            <span class="news-tag">AI 編輯室</span>
+            <span id="aiNewsBannerDate" class="ai-news-banner-date"></span>
+            <span id="aiNewsBannerQuery" class="ai-news-banner-date"></span>
+          </div>
+          <h3 id="aiNewsBannerTitle" class="ai-news-banner-title"></h3>
+        </div>
+      </div>
+
+      <!-- 無封面圖時改用純色 banner 顯示標題 -->
+      <div id="aiNewsPlaceholder" class="ai-news-banner-placeholder">
+        <div class="meta-line">
+          <span class="news-tag">AI 編輯室</span>
+          <span id="aiNewsPlaceholderDate" style="color:var(--color-text-secondary);font-size:0.8rem;"></span>
+          <span id="aiNewsPlaceholderQuery" style="color:var(--color-text-secondary);font-size:0.8rem;"></span>
+        </div>
+        <h3 id="aiNewsPlaceholderTitle" class="ai-news-headline"></h3>
+      </div>
+
+      <!-- 正文區 -->
+      <div class="ai-news-body">
+        <p id="aiNewsSubtitle" class="ai-news-subtitle"></p>
+        <p id="aiNewsSummary" class="ai-news-summary" style="display:none;"></p>
+        <div id="aiNewsContent" class="ai-news-content"></div>
+      </div>
+
+      <!-- 參考來源（底部橫排） -->
+      <div id="aiNewsRefsWrap" class="ai-news-refs" style="display:none;">
+        <h6>參考來源</h6>
+        <ul id="aiNewsRefList" class="ai-news-ref-list"></ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Section divider -->
+<div class="col-lg-12">
+  <div class="section-divider">平台核心功能</div>
+</div>
+
+<!-- Feature cards -->
+<div class="col-lg-12 mb-3">
+  <div class="features-grid">
+
+    <a href="{% url 'app_character_pk:popularity_list' %}" class="feature-card">
+      <div class="feature-icon">📊</div>
+      <h6>賽馬娘人氣列表</h6>
+      <p>各角色評論聲量排行、情感比例分佈，支援篩選、排序與多角色聲量對比折線圖。</p>
+      <span class="feature-arrow">→</span>
+    </a>
+
+    <a href="{% url 'app_user_keyword:home' %}" class="feature-card">
+      <div class="feature-icon">🔍</div>
+      <h6>自訂關鍵詞熱門度</h6>
+      <p>輸入任意關鍵字，分析跨平台聲量趨勢、各類別出現頻率與時序變化。</p>
+      <span class="feature-arrow">→</span>
+    </a>
+
+    <a href="{% url 'app_user_keyword_llm_report:home' %}" class="feature-card">
+      <div class="feature-icon">✨</div>
+      <h6>AI 分析報告</h6>
+      <p>以 Gemini 或 Claude 生成關鍵字深度分析報告，500 字以上 Markdown 格式輸出。</p>
+      <span class="feature-arrow">→</span>
+    </a>
+
+    <a href="{% url 'app_comment_sentiment:dashboard' %}" class="feature-card">
+      <div class="feature-icon">💬</div>
+      <h6>留言情感儀表板</h6>
+      <p>巴哈姆特哈啦板貼文自動爬取，六維度情緒標記，掌握玩家真實反應。</p>
+      <span class="feature-arrow">→</span>
+    </a>
+
+    <a href="{% url 'app_agent_uma:chat_view' %}" class="feature-card">
+      <div class="feature-icon">🤖</div>
+      <h6>Agentic AI 助理</h6>
+      <p>以自然語言提問，AI 自動呼叫聲量、情感、全文搜尋等工具，智慧彙整回答。</p>
+      <span class="feature-arrow">→</span>
+    </a>
+
+    <a href="{% url 'app_rag_uma:chat_view' %}" class="feature-card">
+      <div class="feature-icon">📚</div>
+      <h6>RAG 知識庫問答</h6>
+      <p>上傳文件建立向量知識庫，以語意搜尋搭配 Gemini 生成精確的角色與遊戲知識回答。</p>
+      <span class="feature-arrow">→</span>
+    </a>
+
+  </div>
+</div>
+
+<!-- Section divider -->
+<div class="col-lg-12">
+  <div class="section-divider">更多分析功能</div>
+</div>
+
+<!-- AI tools banner -->
+<div class="col-lg-12 mb-3">
+  <div class="ai-banner">
+    <div class="ai-banner-body">
+      <h5>進階 AI 分析工具</h5>
+      <p>本平台整合 LangChain ReAct、LangGraph 狀態圖、Agentic RAG 等前沿 AI 框架，<br>
+         支援 YouTube 影片情感分析與 Discord 社群自動新聞推播。</p>
+      <div class="ai-banner-links">
+        <a href="{% url 'app_rag_agent:chat_view' %}" class="ai-banner-link">Agentic RAG</a>
+        <a href="{% url 'app_agent_langchain:chat_view' %}" class="ai-banner-link">LangChain ReAct</a>
+        <a href="{% url 'app_agent_langgraph:chat_view' %}" class="ai-banner-link">LangGraph 狀態圖</a>
+        <a href="{% url 'app_youtube_uma:dashboard' %}" class="ai-banner-link">YouTube 情感儀表板</a>
+        <a href="{% url 'app_crawler_admin:dashboard' %}" class="ai-banner-link primary">情報站控制台</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Section divider -->
+<div class="col-lg-12">
+  <div class="section-divider">資料來源</div>
+</div>
+
+<!-- Data sources -->
+<div class="col-lg-12 mb-4">
+  <div class="sources-row">
+    <span class="source-chip"><span class="dot"></span>Bilibili BWIKI</span>
+    <span class="source-chip"><span class="dot"></span>巴哈姆特哈啦板</span>
+    <span class="source-chip"><span class="dot gold"></span>ETtoday 新聞</span>
+    <span class="source-chip"><span class="dot gold"></span>UDN 遊戲版</span>
+    <span class="source-chip"><span class="dot gold"></span>宅宅新聞</span>
+    <span class="source-chip"><span class="dot green"></span>YouTube API</span>
+    <span class="source-chip"><span class="dot"></span>Discord 頻道</span>
+    <span class="source-chip"><span class="dot red"></span>Gemini 情感標記</span>
+    <span class="source-chip"><span class="dot"></span>SnowNLP 評論分析</span>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  var URL_LATEST_AI_NEWS = "{% url 'app_user_keyword_llm_report:api_latest_ai_news' %}";
+
+  loadLatestAiNews();
+
+  function loadLatestAiNews() {
+    fetch(URL_LATEST_AI_NEWS + '?limit=1&status=published')
+      .then(function(resp) {
+        if (!resp.ok) {
+          return resp.text().then(function(body) {
+            throw new Error('HTTP ' + resp.status);
+          });
+        }
+        return resp.json();
+      })
+      .then(function(data) {
+        $('#aiNewsLoading').hide();
+        if (data.error) {
+          $('#aiNewsError').text('新聞資料讀取失敗：' + data.error).show();
+          $('#aiNewsStatusText').text('載入失敗');
+          return;
+        }
+        if (!data.has_news || !data.news || !data.news.length) {
+          $('#aiNewsEmpty').show();
+          $('#aiNewsStatusText').text('目前沒有已發布新聞');
+          return;
+        }
+        var news = data.news[0];
+        var title    = news.title    || 'AI 新聞';
+        var dateText = news.created_at ? ('發布：' + news.created_at.slice(0, 10)) : '';
+        var queryText= news.query    ? ('主題：' + news.query) : '';
+
+        $('#aiNewsStatusText').text('已更新');
+
+        /* ── 封面圖 ── */
+        if (news.cover_image_url) {
+          /* 有封面：顯示橫幅，標題疊在圖上 */
+          $('#aiNewsBannerTitle').text(title);
+          $('#aiNewsBannerDate').text(dateText);
+          $('#aiNewsBannerQuery').text(queryText);
+          $('#aiNewsCoverImg')
+            .attr('src', news.cover_image_url)
+            .on('error', function() {
+              /* 圖載入失敗 → 改顯示純色 placeholder */
+              $('#aiNewsBanner').hide();
+              $('#aiNewsPlaceholderTitle').text(title);
+              $('#aiNewsPlaceholderDate').text(dateText);
+              $('#aiNewsPlaceholderQuery').text(queryText);
+              $('#aiNewsPlaceholder').show();
+            });
+          $('#aiNewsBanner').show();
+          $('#aiNewsPlaceholder').hide();
+        } else {
+          /* 無封面：純色背景顯示標題 */
+          $('#aiNewsPlaceholderTitle').text(title);
+          $('#aiNewsPlaceholderDate').text(dateText);
+          $('#aiNewsPlaceholderQuery').text(queryText);
+          $('#aiNewsPlaceholder').show();
+          $('#aiNewsBanner').hide();
+        }
+
+        /* ── 副標 ── */
+        $('#aiNewsSubtitle').text(news.subtitle || '');
+
+        /* ── 摘要（斜體引言）＋ 正文 ── */
+        if (news.summary) {
+          $('#aiNewsSummary').text(news.summary).show();
+        }
+        $('#aiNewsContent').text(news.content || '');
+
+        /* ── 參考來源（底部橫排） ── */
+        var refs = Array.isArray(news.source_links) ? news.source_links : [];
+        if (refs.length) {
+          var html = '';
+          refs.slice(0, 5).forEach(function(item) {
+            var t = item.title || '來源';
+            var d = item.date  ? ('（' + item.date + '）') : '';
+            html += item.link
+              ? '<li><a href="' + item.link + '" target="_blank" rel="noopener">' + t + '</a>' + d + '</li>'
+              : '<li>' + t + d + '</li>';
+          });
+          $('#aiNewsRefList').html(html);
+          $('#aiNewsRefsWrap').show();
+        }
+
+        $('#aiNewsMain').show();
+      })
+      .catch(function(err) {
+        $('#aiNewsLoading').hide();
+        $('#aiNewsError').text('新聞資料讀取失敗，請稍後再試。').show();
+        $('#aiNewsStatusText').text('載入失敗');
+      });
+  }
+</script>
+{% endblock %}

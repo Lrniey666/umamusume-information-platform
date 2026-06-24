@@ -1,0 +1,61 @@
+# ════════════════════════════════════════════════
+# 賽馬娘輿情分析平台 — requirements.txt
+# 版本查證日期：2026-06-22
+# Python 需求：3.12+
+# ════════════════════════════════════════════════
+
+# ── Web 框架 ─────────────────────────────────────
+Django==5.2.15                  # LTS，支援至 2028-04，優於 6.0（非LTS）
+gunicorn>=23.0                  # WSGI 伺服器，Docker 部署用
+whitenoise>=6.7                 # 靜態檔案服務（開發/非 Docker 用）
+
+# ── 資料庫驅動 ───────────────────────────────────
+psycopg[binary]>=3.1            # PostgreSQL 驅動（Docker 正式部署用；本機 SQLite 不需要）
+
+# ── AI SDKs（版本已於 2026-06-22 查證）──────────
+# ⚠️ 勿使用 google-generativeai（已棄用）
+# ⚠️ gemini-2.0-flash 已於 2026-06-01 停服，請用 gemini-3.5-flash
+google-genai==2.9.0             # 官方新版 Gemini SDK（取代 google-generativeai）
+openai>=1.50.0                  # OpenAI SDK，供 Gemini OpenAI 相容端點使用
+anthropic==0.111.0              # Claude SDK，最新版（2026-06-18）
+
+# ── 向量搜尋（RAG）───────────────────────────────
+faiss-cpu==1.14.2               # FAISS 最新穩定版（2026-05-22）
+numpy>=1.26
+
+# ── 排程器 ────────────────────────────────────────
+# ⚠️ APScheduler 4.x 仍為 alpha，使用穩定 3.x
+APScheduler==3.11.2
+django-apscheduler==0.7.0       # 最新版（2024-09-28），相容 Django 5.x
+
+# ── 資料處理 ──────────────────────────────────────
+pandas>=2.2
+jieba>=0.42                     # 中文分詞
+opencc-python-reimplemented>=0.1.7  # 簡繁轉換
+
+# ── 網頁爬蟲 ─────────────────────────────────────
+requests>=2.32
+beautifulsoup4>=4.12
+lxml>=5.0
+selenium>=4.20
+
+# ── PDF 解析（RAG 知識庫用）──────────────────────
+pypdf>=4.0
+
+# ── Markdown 處理 ──────────────────────────────────
+markdown>=3.6
+
+# ── 工具 ──────────────────────────────────────────
+python-dotenv>=1.0
+django-cors-headers>=4.3
+
+# ── LangChain / LangGraph（O2/O3）───────────────────
+langchain>=1.3.0                # LangChain 主套件
+langchain-google-genai>=4.2.0   # Gemini 整合
+langgraph>=0.2.0                # LangGraph 狀態圖
+
+# ── Discord Bot（D1-D8）─────────────────────────────
+discord.py==2.4.0               # Discord Bot SDK（MIT 授權）
+
+# ── UMA Info Portal（U1-U16）────────────────────────
+pytz>=2024.1                    # 時區處理（GuildSetting 推播時區計算）

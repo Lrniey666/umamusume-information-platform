@@ -1,0 +1,775 @@
+{% extends 'base.html' %}
+{% block title %}賽馬娘人氣列表{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* ── Page header ───────────────────────────────── */
+  .page-header { padding: 1.2rem 0 0.4rem; }
+  .page-header h2 { font-weight: 700; margin-bottom: 0.25rem; }
+
+  /* ── Character card ────────────────────────────── */
+  .character-card {
+    border-radius: 14px;
+    cursor: pointer;
+    border: 2px solid var(--color-border);
+    background-color: var(--color-bg-surface);
+    transform-style: preserve-3d;
+    transform: perspective(600px);
+    transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.18s ease;
+    user-select: none;
+    position: relative;
+    overflow: visible;
+  }
+  .character-card {
+    animation: breathe-border-card 4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+    animation-delay: calc(var(--phase, 0) * -1s);
+  }
+  @keyframes breathe-border-card {
+    0%,100% { border-color: color-mix(in srgb, var(--color-accent) 25%, var(--color-border)); }
+    50%      { border-color: color-mix(in srgb, var(--color-accent) 68%, var(--color-border)); }
+  }
+  .character-card:hover {
+    box-shadow: 0 14px 36px var(--color-shadow-lg);
+    animation: none;
+    border-color: var(--color-accent);
+    z-index: 10;
+  }
+  .character-card:active { transform: perspective(600px) scale(0.98); }
+
+  /* Selected state */
+  .character-card.selected {
+    border-color: var(--color-accent) !important;
+    box-shadow: 0 0 0 3px var(--color-accent-soft), 0 8px 24px var(--color-shadow-md) !important;
+    animation: none !important;
+  }
+  .character-card .selected-badge {
+    display: none;
+    position: absolute;
+    top: -8px; right: -8px;
+    background: var(--color-accent);
+    color: #fff;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 12px;
+    white-space: nowrap;
+    animation: badge-pop 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+  .character-card.selected .selected-badge { display: block; }
+
+  /* Avatar 3D floating */
+  .char-avatar {
+    transform: translateZ(8px);
+    transition: transform 0.2s ease;
+  }
+  .character-card:hover .char-avatar {
+    transform: translateZ(14px) scale(1.04);
+  }
+
+  /* ── Avatar circle ─────────────────────────────── */
+  .avatar-img {
+    width: 76px; height: 76px;
+    object-fit: cover;
+    border-radius: 50%;
+    border: 2px solid var(--color-accent);
+    transition: border-color 0.25s ease;
+    display: block;
+    margin: 0 auto 0.5rem;
+  }
+  .avatar-fallback {
+    width: 76px; height: 76px;
+    border-radius: 50%;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 0.5rem;
+    font-size: 1.3rem;
+    font-weight: 700;
+    background-color: var(--color-accent-soft);
+    color: var(--color-accent);
+    border: 2px solid var(--color-accent);
+  }
+
+  /* ── Sentiment bar ─────────────────────────────── */
+  .senti-bar {
+    display: flex;
+    border-radius: 4px;
+    overflow: hidden;
+    height: 7px;
+    margin: 6px 0 3px;
+  }
+  .senti-bar .seg { transition: width 0.4s ease; }
+  .seg-pos { background: var(--color-positive); }
+  .seg-neu { background: var(--color-neutral-tone, #9c8fb0); }
+  .seg-neg { background: var(--color-negative); }
+  .senti-labels { font-size: 0.7rem; }
+  .senti-labels .pos-l { color: var(--color-positive); }
+  .senti-labels .neu-l { color: var(--color-text-secondary); }
+  .senti-labels .neg-l { color: var(--color-negative); }
+
+  /* ── Chart section ─────────────────────────────── */
+  .chart-card { border-radius: 12px; }
+  .chart-card .card-header {
+    border-radius: 12px 12px 0 0;
+    font-size: 0.88rem;
+    font-weight: 600;
+    padding: 0.65rem 1rem;
+  }
+
+  /* ── Loading / Empty states ────────────────────── */
+  #cardLoadingState { color: var(--color-text-secondary); }
+  #emptyCards       { display: none; color: var(--color-text-secondary); }
+
+  /* ── Controls bar ──────────────────────────────── */
+  .controls-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+    padding: 0.65rem 1rem;
+    border-bottom: 1px solid var(--color-border);
+    background: var(--color-navbar-bg);
+    border-radius: 0;
+    transition: background-color 0.3s ease, border-color 0.3s ease;
+  }
+  .controls-bar label {
+    font-size: 0.82rem;
+    color: var(--color-text-secondary);
+    margin-bottom: 0;
+    white-space: nowrap;
+  }
+  .controls-bar .form-select,
+  .controls-bar .form-control {
+    font-size: 0.82rem;
+    padding: 0.28rem 0.55rem;
+    height: auto;
+    min-width: 0;
+    background-color: var(--color-bg-surface);
+    border-color: var(--color-border);
+    color: var(--color-text-primary);
+  }
+  .ctrl-sep {
+    width: 1px;
+    height: 22px;
+    background: var(--color-border);
+    flex-shrink: 0;
+  }
+  .sort-dir-btn {
+    font-size: 0.82rem;
+    padding: 0.28rem 0.7rem;
+    border-radius: 6px;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-surface);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+    color: var(--color-text-primary);
+  }
+  .sort-dir-btn:hover {
+    background: var(--color-accent-soft);
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+  }
+  .apply-btn {
+    font-size: 0.82rem;
+    padding: 0.28rem 1rem;
+    border-radius: 6px;
+    border: none;
+    background: var(--color-accent);
+    color: #fff;
+    cursor: pointer;
+    font-weight: 600;
+    transition: opacity 0.15s;
+  }
+  .apply-btn:hover { opacity: 0.85; }
+  .reset-btn {
+    font-size: 0.82rem;
+    padding: 0.28rem 0.8rem;
+    border-radius: 6px;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-surface);
+    cursor: pointer;
+    color: var(--color-text-secondary);
+    transition: background 0.15s, color 0.15s;
+  }
+  .reset-btn:hover {
+    background: var(--color-accent-soft);
+    color: var(--color-accent);
+    border-color: var(--color-accent);
+  }
+  #filterResultHint {
+    font-size: 0.78rem;
+    color: var(--color-text-secondary);
+    margin-left: auto;
+  }
+
+  /* ── Pagination bar ─────────────────────────────── */
+  .pagination-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.65rem 1rem 0.5rem;
+    border-top: 1px solid var(--color-border);
+    margin-top: 0.5rem;
+  }
+  .page-size-group { display: flex; gap: 0.3rem; align-items: center; }
+  .page-size-group label { font-size: 0.8rem; color: var(--color-text-secondary); }
+  .ps-btn {
+    font-size: 0.8rem;
+    padding: 0.22rem 0.7rem;
+    border-radius: 20px;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-surface);
+    cursor: pointer;
+    transition: all 0.15s;
+    color: var(--color-text-primary);
+  }
+  .ps-btn.active,
+  .ps-btn:hover { background: var(--color-accent); color: #fff; border-color: var(--color-accent); }
+
+  .page-nav { display: flex; gap: 0.25rem; align-items: center; }
+  .pn-btn {
+    font-size: 0.82rem;
+    padding: 0.22rem 0.7rem;
+    border-radius: 20px;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-surface);
+    cursor: pointer;
+    transition: all 0.15s;
+    color: var(--color-text-primary);
+  }
+  .pn-btn.active { background: var(--color-accent); color: #fff; border-color: var(--color-accent); pointer-events: none; }
+  .pn-btn:hover:not(.active):not(:disabled) { background: var(--color-accent-soft); border-color: var(--color-accent); color: var(--color-accent); }
+  .pn-btn:disabled { opacity: 0.38; cursor: default; }
+  .page-info { font-size: 0.78rem; color: var(--color-text-secondary); }
+
+  /* ── Compare hint ──────────────────────────────── */
+  #compareHint {
+    font-size: 0.8rem;
+    color: var(--color-text-secondary);
+    margin-bottom: 0.4rem;
+  }
+  .compare-reset-btn {
+    font-size: 0.78rem;
+    padding: 2px 10px;
+    border-radius: 12px;
+    border: 1px solid var(--color-border);
+    background: transparent;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    margin-left: 6px;
+  }
+  .compare-reset-btn:hover {
+    background: var(--color-accent-soft);
+    color: var(--color-accent);
+    border-color: var(--color-accent);
+  }
+
+  /* ── Page-level badge strip ─────────────────────── */
+  .page-badge-strip {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-top: 0.4rem;
+  }
+  .page-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 3px 12px;
+    border-radius: var(--radius-pill);
+    font-size: 0.78rem;
+    font-weight: 600;
+    background: var(--color-accent-soft);
+    color: var(--color-accent);
+    border: 1px solid var(--color-border);
+  }
+  .page-badge.gold {
+    background: var(--color-gold-soft, #f7e4ae);
+    color: var(--color-gold);
+    border-color: color-mix(in srgb, var(--color-gold) 30%, transparent);
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page header -->
+<div class="col-lg-12 page-header">
+  <h2>賽馬娘人氣列表</h2>
+  <p class="text-muted">依據 Bilibili Wiki 評論聲量與 SnowNLP 情緒分析，展示各角色人氣與口碑</p>
+  <div class="page-badge-strip">
+    <span class="page-badge">角色人氣排行</span>
+    <span class="page-badge gold">評論聲量 PK</span>
+    <span class="page-badge">多角色對比</span>
+  </div>
+</div>
+
+<!-- Character cards -->
+<div class="col-lg-12 mb-3">
+  <div class="card chart-card">
+
+    <!-- Card header -->
+    <div class="card-header d-flex align-items-center justify-content-between">
+      <h5 class="mb-0">角色人氣排行</h5>
+      <span id="compareHint" class="d-none">
+        點擊卡片切換角色 ／ 按住 <kbd style="font-size:0.75rem;">Ctrl</kbd> 多選比較
+        <button class="compare-reset-btn" onclick="resetCompare()">清除比較</button>
+      </span>
+    </div>
+
+    <!-- Sort & Filter controls -->
+    <div class="controls-bar" id="controlsBar" style="display:none;">
+
+      <!-- Sort -->
+      <label>排序：</label>
+      <select id="sortField" class="form-select" style="width:auto;">
+        <option value="none">原始順序</option>
+        <option value="comments">評論數</option>
+        <option value="likes">讚數</option>
+        <option value="positive">正面比例</option>
+      </select>
+      <button id="sortDirBtn" class="sort-dir-btn" onclick="toggleSortDir()">↓ 降序</button>
+
+      <div class="ctrl-sep"></div>
+
+      <!-- Filter -->
+      <label>篩選：評論 ≥</label>
+      <input id="minComments" type="number" class="form-control" style="width:80px;" min="0" placeholder="0">
+      <label>讚 ≥</label>
+      <input id="minLikes" type="number" class="form-control" style="width:80px;" min="0" placeholder="0">
+
+      <div class="ctrl-sep"></div>
+
+      <button class="apply-btn" onclick="applyFiltersAndSort()">套用</button>
+      <button class="reset-btn" onclick="resetFilters()">重置</button>
+
+      <span id="filterResultHint"></span>
+    </div>
+
+    <div class="card-body">
+      <div id="cardLoadingState" class="text-center py-4">
+        <div class="empty-icon">◎</div>
+        <p class="mt-2">資料載入中…</p>
+      </div>
+      <div id="emptyCards" class="text-center py-4" style="display:none;">
+        <div class="empty-state">
+          <div class="empty-icon">😅</div>
+          <p class="mt-2 mb-0">尚無角色資料，請先執行評論爬蟲</p>
+        </div>
+      </div>
+      <div id="filterEmptyState" class="text-center py-4" style="display:none;">
+        <div class="empty-icon">🔍</div>
+        <p class="mt-2 mb-0">沒有符合篩選條件的角色，請調整條件</p>
+      </div>
+      <div id="characterCards" class="row g-3" style="display:none;"></div>
+
+      <!-- Pagination bar -->
+      <div class="pagination-bar" id="paginationBar" style="display:none;">
+        <div class="page-size-group">
+          <label>每頁：</label>
+          <button class="ps-btn" data-ps="4"   onclick="setPageSize(4)">4</button>
+          <button class="ps-btn" data-ps="8"   onclick="setPageSize(8)">8</button>
+          <button class="ps-btn" data-ps="16"  onclick="setPageSize(16)">16</button>
+          <button class="ps-btn active" data-ps="32" onclick="setPageSize(32)">32</button>
+          <button class="ps-btn" data-ps="64"  onclick="setPageSize(64)">64</button>
+          <button class="ps-btn" data-ps="128" onclick="setPageSize(128)">128</button>
+        </div>
+
+        <div class="page-nav" id="pageNav"></div>
+
+        <div class="page-info" id="pageInfo"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- PK line chart -->
+<div class="col-lg-12 mb-3">
+  <div class="card chart-card">
+    <div class="card-header">
+      <h5 class="mb-0" id="chartTitle">評論聲量變化</h5>
+    </div>
+    <div class="card-body">
+      <div class="chart-skeleton" id="chartSkeleton" style="height:360px;"></div>
+      <div class="chart-canvas-wrap is-loading" id="chartCanvasWrap">
+        <div class="chart-fixed chart-tall">
+          <canvas id="pkLineChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.13.0/moment.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.3/Chart.min.js"></script>
+<script>
+  /* ════════════════════════════════════════════════════════════
+     Globals
+     ════════════════════════════════════════════════════════════ */
+  var _pkData      = null;
+  var _lineChart   = null;
+  var _selected    = [];
+
+  /* Sort / Filter / Pagination state */
+  var _sortField   = 'none';
+  var _sortDir     = 'desc';
+  var _minComments = 0;
+  var _minLikes    = 0;
+  var _filtered    = [];
+  var _pageSize    = 32;
+  var _currentPage = 1;
+
+  /* ════════════════════════════════════════════════════════════
+     Load data
+     ════════════════════════════════════════════════════════════ */
+  call_ajax();
+
+  function call_ajax() {
+    $.ajax({
+      type: 'GET', url: '{% url "app_character_pk:api_get_character_pk" %}',
+      success: function(data) {
+        _pkData = data;
+        var n = (data.list_pkNames || []).length;
+        $('#cardLoadingState').hide();
+        if (n === 0) { $('#emptyCards').show(); return; }
+        $('#compareHint').removeClass('d-none');
+        $('#controlsBar').show();
+        _filtered = [];
+        for (var i = 0; i < n; i++) _filtered.push(i);
+        renderPage();
+        if (_filtered.length > 0) {
+          _selected = [_filtered[0]];
+          syncCardHighlight();
+          redrawLineChart();
+        }
+      },
+      error: function() {
+        $('#cardLoadingState').hide();
+        $('#emptyCards').show();
+        $('#chartSkeleton').hide();
+      }
+    });
+  }
+
+  /* ════════════════════════════════════════════════════════════
+     Sort / Filter / Pagination helpers
+     ════════════════════════════════════════════════════════════ */
+
+  function applyFiltersAndSort() {
+    if (!_pkData) return;
+    _sortField   = $('#sortField').val();
+    _minComments = parseInt($('#minComments').val()) || 0;
+    _minLikes    = parseInt($('#minLikes').val())    || 0;
+
+    var names    = _pkData.list_pkNames        || [];
+    var comments = _pkData.list_total_comments || [];
+    var likes    = _pkData.list_total_likes    || [];
+    var sentis   = _pkData.list_sentiInfo      || [];
+    var n        = names.length;
+
+    var indices = [];
+    for (var i = 0; i < n; i++) {
+      if ((comments[i] || 0) >= _minComments && (likes[i] || 0) >= _minLikes)
+        indices.push(i);
+    }
+
+    if (_sortField !== 'none') {
+      indices.sort(function(a, b) {
+        var va, vb;
+        if (_sortField === 'comments') { va = comments[a] || 0; vb = comments[b] || 0; }
+        else if (_sortField === 'likes') { va = likes[a] || 0; vb = likes[b] || 0; }
+        else { va = (sentis[a] || [0])[0]; vb = (sentis[b] || [0])[0]; }
+        return _sortDir === 'desc' ? vb - va : va - vb;
+      });
+    }
+
+    _filtered    = indices;
+    _currentPage = 1;
+    renderPage();
+
+    var visibleSelected = _selected.filter(function(i) { return _filtered.indexOf(i) !== -1; });
+    if (visibleSelected.length === 0 && _filtered.length > 0) {
+      _selected = [_filtered[0]];
+      syncCardHighlight();
+      redrawLineChart();
+    }
+  }
+
+  function resetFilters() {
+    $('#sortField').val('none');
+    $('#minComments').val('');
+    $('#minLikes').val('');
+    _sortDir = 'desc';
+    $('#sortDirBtn').text('↓ 降序');
+    _sortField = 'none'; _minComments = 0; _minLikes = 0;
+    if (_pkData) {
+      _filtered = [];
+      var n = (_pkData.list_pkNames || []).length;
+      for (var i = 0; i < n; i++) _filtered.push(i);
+      _currentPage = 1;
+      renderPage();
+    }
+  }
+
+  function toggleSortDir() {
+    _sortDir = (_sortDir === 'desc') ? 'asc' : 'desc';
+    $('#sortDirBtn').text(_sortDir === 'desc' ? '↓ 降序' : '↑ 升序');
+  }
+
+  /* ════════════════════════════════════════════════════════════
+     Pagination
+     ════════════════════════════════════════════════════════════ */
+  function setPageSize(ps) {
+    _pageSize = ps;
+    _currentPage = 1;
+    $('.ps-btn').removeClass('active');
+    $('.ps-btn[data-ps="' + ps + '"]').addClass('active');
+    renderPage();
+  }
+
+  function goPage(p) {
+    var totalPages = Math.max(1, Math.ceil(_filtered.length / _pageSize));
+    if (p < 1 || p > totalPages) return;
+    _currentPage = p;
+    renderPage();
+    document.getElementById('characterCards').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  /* ════════════════════════════════════════════════════════════
+     Render page of cards
+     ════════════════════════════════════════════════════════════ */
+  function renderPage() {
+    if (!_pkData) return;
+    var names    = _pkData.list_pkNames        || [];
+    var photos   = _pkData.list_photos         || [];
+    var sentis   = _pkData.list_sentiInfo      || [];
+    var comments = _pkData.list_total_comments || [];
+    var likes    = _pkData.list_total_likes    || [];
+    var total    = _filtered.length;
+
+    var hint = total < names.length
+      ? ('篩選結果：' + total + ' / ' + names.length + ' 位角色')
+      : ('共 ' + total + ' 位角色');
+    $('#filterResultHint').text(hint);
+
+    if (total === 0) {
+      $('#filterEmptyState').show();
+      $('#characterCards').hide();
+      $('#paginationBar').hide();
+      return;
+    }
+    $('#filterEmptyState').hide();
+
+    var start  = (_currentPage - 1) * _pageSize;
+    var end    = Math.min(start + _pageSize, total);
+    var slice  = _filtered.slice(start, end);
+
+    var html = '';
+    for (var si = 0; si < slice.length; si++) {
+      var i     = slice[si];
+      var senti = sentis[i] || [0, 0, 0];
+      var phase = (si / slice.length * 4).toFixed(2);
+      html += '<div class="col-lg-3 col-md-4 col-sm-6">' +
+        '<div class="card h-100 character-card" style="--phase:' + phase + 's;"' +
+             ' data-idx="' + i + '" onclick="handleCardClick(event,' + i + ')">' +
+          '<span class="selected-badge">✓ 比較中</span>' +
+          '<div class="card-body text-center p-3">' +
+            '<div class="char-avatar">' +
+              '<img src="' + (photos[i] || '') + '" class="avatar-img"' +
+                   ' onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';" />' +
+              '<div class="avatar-fallback">' + (names[i] ? names[i].charAt(0) : '?') + '</div>' +
+            '</div>' +
+            '<div class="fw-bold small" style="color:var(--color-text-primary);">' + names[i] + '</div>' +
+            '<div style="font-size:0.75rem;color:var(--color-text-secondary);">' +
+              '評論 ' + (comments[i] || 0) + '　讚 ' + (likes[i] || 0) +
+            '</div>' +
+            '<div class="senti-bar">' +
+              '<div class="seg seg-pos" style="width:' + senti[0] + '%;" title="正面 ' + senti[0] + '%"></div>' +
+              '<div class="seg seg-neu" style="width:' + senti[1] + '%;" title="中立 ' + senti[1] + '%"></div>' +
+              '<div class="seg seg-neg" style="width:' + senti[2] + '%;" title="負面 ' + senti[2] + '%"></div>' +
+            '</div>' +
+            '<div class="senti-labels d-flex justify-content-between">' +
+              '<span class="pos-l">▲' + senti[0] + '%</span>' +
+              '<span class="neu-l">—' + senti[1] + '%</span>' +
+              '<span class="neg-l">▼' + senti[2] + '%</span>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    }
+
+    $('#characterCards').html(html).show();
+    initCardTilt();
+    syncCardHighlight();
+    renderPagination(total);
+  }
+
+  function renderPagination(total) {
+    var totalPages = Math.max(1, Math.ceil(total / _pageSize));
+    var cp         = _currentPage;
+    var start      = (cp - 1) * _pageSize + 1;
+    var end        = Math.min(cp * _pageSize, total);
+
+    $('#pageInfo').text('第 ' + start + '–' + end + ' 位，共 ' + total + ' 位');
+
+    var pages = [];
+    var addedEllipsis = false;
+    for (var p = 1; p <= totalPages; p++) {
+      if (p === 1 || p === totalPages || (p >= cp - 2 && p <= cp + 2)) {
+        pages.push(p);
+        addedEllipsis = false;
+      } else if (!addedEllipsis) {
+        pages.push('…');
+        addedEllipsis = true;
+      }
+    }
+
+    var nav = '<button class="pn-btn" onclick="goPage(' + (cp - 1) + ')"' +
+              (cp <= 1 ? ' disabled' : '') + '>‹</button>';
+    for (var j = 0; j < pages.length; j++) {
+      var pg = pages[j];
+      if (pg === '…') {
+        nav += '<span style="padding:0 4px;color:var(--color-text-secondary);">…</span>';
+      } else {
+        nav += '<button class="pn-btn' + (pg === cp ? ' active' : '') +
+               '" onclick="goPage(' + pg + ')">' + pg + '</button>';
+      }
+    }
+    nav += '<button class="pn-btn" onclick="goPage(' + (cp + 1) + ')"' +
+           (cp >= totalPages ? ' disabled' : '') + '>›</button>';
+
+    $('#pageNav').html(nav);
+    $('#paginationBar').show();
+  }
+
+  /* ════════════════════════════════════════════════════════════
+     Card click handler (Ctrl = multi-select)
+     ════════════════════════════════════════════════════════════ */
+  function handleCardClick(evt, idx) {
+    if (!_pkData) return;
+    if (evt.ctrlKey || evt.metaKey) {
+      var pos = _selected.indexOf(idx);
+      if (pos === -1) { _selected.push(idx); }
+      else if (_selected.length > 1) { _selected.splice(pos, 1); }
+    } else {
+      _selected = [idx];
+    }
+    syncCardHighlight();
+    redrawLineChart();
+  }
+
+  function syncCardHighlight() {
+    $('.character-card').removeClass('selected');
+    _selected.forEach(function(i) {
+      $('.character-card[data-idx="' + i + '"]').addClass('selected');
+    });
+  }
+
+  function resetCompare() {
+    if (_selected.length > 0) {
+      _selected = [_selected[0]];
+      syncCardHighlight();
+      redrawLineChart();
+    }
+  }
+
+  function redrawLineChart() {
+    if (!_pkData || !_selected.length) return;
+    var names  = _selected.map(function(i) { return _pkData.list_pkNames[i]; });
+    var freqs  = _selected.map(function(i) { return _pkData.list_freq_daily[i]; });
+    var colors = _selected.map(function(i) { return _pkData.list_colors[i]; });
+    drawLineChart(names, freqs, colors);
+    $('#chartTitle').text(
+      _selected.length === 1
+        ? _pkData.list_pkNames[_selected[0]] + ' 評論聲量變化'
+        : '多角色聲量對比（' + names.join(' vs ') + '）'
+    );
+  }
+
+  /* ════════════════════════════════════════════════════════════
+     Line chart
+     ════════════════════════════════════════════════════════════ */
+  Chart.defaults.global.defaultFontSize   = 14;
+  Chart.defaults.global.defaultFontColor  = getComputedStyle(document.documentElement)
+                                              .getPropertyValue('--color-text-secondary').trim() || '#6B6560';
+  Chart.defaults.global.defaultFontFamily =
+    '"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif';
+
+  function drawLineChart(names, freqDatasets, colors) {
+    if (_lineChart) { _lineChart.destroy(); }
+    var sk = document.getElementById('chartSkeleton');
+    var cw = document.getElementById('chartCanvasWrap');
+    sk.style.display = 'block';
+    cw.classList.remove('is-loaded'); cw.classList.add('is-loading');
+    var tc = getComputedStyle(document.documentElement)
+               .getPropertyValue('--color-text-secondary').trim() || '#6B6560';
+    var datasets = names.map(function(name, i) {
+      var rawColor = colors[i] || 'rgba(54,162,235,0.8)';
+      return {
+        label: name, borderColor: rawColor,
+        backgroundColor: rawColor.replace(/[\d.]+\)$/, '0.10)'),
+        borderWidth: 2.5, lineTension: 0.35, fill: false,
+        pointRadius: 0, pointHoverRadius: 7,
+        pointBackgroundColor: rawColor, pointBorderColor: '#fff', pointBorderWidth: 1.5,
+        data: freqDatasets[i] || []
+      };
+    });
+    _lineChart = new Chart(
+      document.getElementById('pkLineChart').getContext('2d'),
+      {
+        type: 'line', data: { datasets: datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          legend: { display: true, labels: { fontColor: tc, fontSize: 13, usePointStyle: true, padding: 16 } },
+          tooltips: { mode: 'index', intersect: false, bodyFontSize: 13, titleFontSize: 13 },
+          scales: {
+            xAxes: [{
+              type: 'time',
+              time: { unit: 'month', displayFormats: { month: 'YY/MM' } },
+              ticks: {
+                fontColor: tc, fontSize: 12, maxTicksLimit: 13,
+                autoSkip: true, maxRotation: 30, minRotation: 0
+              },
+              gridLines: { color: 'rgba(128,128,128,0.10)', drawBorder: false }
+            }],
+            yAxes: [{ ticks: { beginAtZero: true, fontColor: tc, fontSize: 12, precision: 0 },
+                      scaleLabel: { display: true, labelString: '評論數', fontColor: tc, fontSize: 13 },
+                      gridLines: { color: 'rgba(128,128,128,0.10)', drawBorder: false } }]
+          }
+        }
+      }
+    );
+    setTimeout(function() {
+      sk.style.display = 'none';
+      cw.classList.remove('is-loading'); cw.classList.add('is-loaded');
+    }, 120);
+  }
+
+  /* ════════════════════════════════════════════════════════════
+     3D Card tilt
+     ════════════════════════════════════════════════════════════ */
+  function initCardTilt() {
+    document.querySelectorAll('.character-card').forEach(function(card) {
+      card.addEventListener('mousemove', function(e) {
+        var rect = card.getBoundingClientRect();
+        var rx = (e.clientY - rect.top  - rect.height / 2) / (rect.height / 2) * -6;
+        var ry = (e.clientX - rect.left - rect.width  / 2) / (rect.width  / 2) *  6;
+        card.style.transform = 'perspective(600px) rotateX(' + rx + 'deg) rotateY(' + ry + 'deg) translateY(-5px)';
+        card.style.boxShadow = '0 14px 32px var(--color-shadow-lg)';
+      });
+      card.addEventListener('mouseleave', function() {
+        card.style.transform = 'perspective(600px)';
+        card.style.boxShadow = '';
+      });
+    });
+  }
+</script>
+{% endblock %}
