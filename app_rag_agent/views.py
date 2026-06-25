@@ -167,18 +167,34 @@ def api_chat(request):
         if not candidate:
             break
 
-        part = candidate.content.parts[0] if candidate.content.parts else None
-        if not part:
+        parts = candidate.content.parts if candidate.content and candidate.content.parts else []
+        if not parts:
             break
 
-        if hasattr(part, 'function_call') and part.function_call:
-            fc = part.function_call
+        # 思考模型會先輸出 thought 部分，function_call 可能不在 parts[0]
+        fc_part = next(
+            (p for p in parts if hasattr(p, 'function_call') and p.function_call),
+            None,
+        )
+
+        if fc_part:
+            fc = fc_part.function_call
             tool_result = _call_tool(fc.name, dict(fc.args), client)
-            messages.append({'role': 'model', 'parts': [{'function_call': {'name': fc.name, 'args': dict(fc.args)}}]})
+            # 必須使用原始 candidate.content（保留 thought_signature），
+            # 手動重建會丟失 thought_signature，導致 400 INVALID_ARGUMENT
+            messages.append(candidate.content)
             messages.append({'role': 'user', 'parts': [{'function_response': {'name': fc.name, 'response': {'result': tool_result}}}]})
             continue
 
-        answer = part.text if hasattr(part, 'text') else str(part)
+        # 找到第一個有文字的 part 作為最終回答
+        text_part = next(
+            (p for p in parts if hasattr(p, 'text') and p.text),
+            None,
+        )
+        if not text_part:
+            break
+
+        answer = text_part.text
         history.append({'role': 'user', 'parts': [{'text': user_msg}]})
         history.append({'role': 'model', 'parts': [{'text': answer}]})
         request.session['rag_agent_history'] = history[-20:]

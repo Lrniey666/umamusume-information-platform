@@ -619,6 +619,59 @@ def api_youtube_crawl(request):
         return JsonResponse({'error': str(e)}, status=500)
 
 
+def api_youtube_sentiment_stats(request):
+    """YouTube 影片情感分析統計（供後台面板即時刷新）"""
+    try:
+        from app_youtube_uma.models import YouTubeVideo
+        from django.db.models import Avg, Count
+
+        total = YouTubeVideo.objects.count()
+        analyzed = YouTubeVideo.objects.filter(sentiment__isnull=False).count()
+        pending = total - analyzed
+
+        pos = YouTubeVideo.objects.filter(sentiment__gte=0.6).count()
+        neg = YouTubeVideo.objects.filter(sentiment__lte=0.4).count()
+        neu = analyzed - pos - neg
+
+        avg_row = YouTubeVideo.objects.filter(sentiment__isnull=False).aggregate(avg=Avg('sentiment'))
+        avg_sentiment = round((avg_row['avg'] or 0) * 100, 1)
+
+        analyzed_pct = round(analyzed / total * 100, 1) if total else 0.0
+
+        return JsonResponse({
+            'total': total,
+            'analyzed': analyzed,
+            'pending': pending,
+            'analyzed_pct': analyzed_pct,
+            'positive': pos,
+            'neutral': neu,
+            'negative': neg,
+            'avg_sentiment': avg_sentiment,
+        })
+    except Exception as exc:
+        return JsonResponse({'error': str(exc)}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(['POST'])
+def api_youtube_analyze(request):
+    """手動觸發 YouTube 情感分析（非同步，最多分析 50 部）"""
+    import subprocess
+    import sys
+    from django.conf import settings as django_settings
+    limit = _parse_int(request.POST.get('limit', 50), default=50, min_value=1, max_value=200)
+    try:
+        subprocess.Popen(
+            [sys.executable, 'manage.py', 'analyze_youtube_sentiment', '--limit', str(limit)],
+            cwd=str(django_settings.BASE_DIR),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        return JsonResponse({'status': 'started', 'limit': limit})
+    except Exception as exc:
+        return JsonResponse({'error': str(exc)}, status=500)
+
+
 # ── API: Pipeline 執行（F1）──────────────────────────────
 
 @csrf_exempt

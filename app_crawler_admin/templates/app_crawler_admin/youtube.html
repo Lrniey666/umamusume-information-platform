@@ -16,6 +16,24 @@
   .sentiment-fill-pos{height:100%;background:var(--positive);}
   .sentiment-fill-neg{height:100%;background:var(--negative);}
   .sentiment-fill-neu{height:100%;background:var(--warning);}
+
+  /* 情感分析面板 */
+  .senti-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start;}
+  @media(max-width:640px){.senti-grid{grid-template-columns:1fr;}}
+  .senti-stat-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;}
+  .senti-stat-row:last-child{border-bottom:none;}
+  .senti-label{color:var(--muted);}
+  .senti-value{font-weight:600;}
+  .senti-analyzed-bar{height:10px;border-radius:5px;background:var(--border);overflow:hidden;margin:8px 0;}
+  .senti-analyzed-fill{height:100%;background:var(--accent);transition:width .5s;}
+  .senti-dist-bar{display:flex;height:18px;border-radius:4px;overflow:hidden;margin:8px 0;}
+  .senti-dist-pos{background:var(--positive);transition:width .5s;}
+  .senti-dist-neu{background:var(--warning);transition:width .5s;}
+  .senti-dist-neg{background:var(--negative);transition:width .5s;}
+  .senti-dist-legend{display:flex;gap:12px;font-size:11px;color:var(--muted);}
+  .senti-dist-legend span{display:flex;align-items:center;gap:4px;}
+  .senti-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+  .analyze-status{font-size:12px;color:var(--muted);margin-top:6px;min-height:18px;}
 </style>
 {% endblock %}
 
@@ -28,6 +46,7 @@
     </div>
     <div class="all-btn-row">
       <button class="btn btn-accent btn-sm" id="crawlBtn" onclick="triggerCrawl()">▶ 手動爬取</button>
+      <button class="btn btn-success btn-sm" id="analyzeBtn" onclick="triggerAnalyze()">🤖 手動情感分析</button>
       <button class="btn btn-outline-secondary btn-sm" onclick="loadData()">↻ 重新整理</button>
     </div>
   </div>
@@ -156,6 +175,92 @@
   </div>
 </div>
 
+<!-- 情感分析面板 -->
+<div class="card mb-3">
+  <div class="card-header-bar">
+    <h5>🤖 情感分析管理</h5>
+    <span id="sentiRefreshTime" style="font-size:11px;color:var(--muted)"></span>
+  </div>
+  <div class="card-body">
+    <div class="senti-grid">
+
+      <!-- 左：分析進度 + 觸發 -->
+      <div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">分析完成度</div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;">
+          <span>已分析 <strong id="sentiAnalyzed">—</strong> 部</span>
+          <span id="sentiAnalyzedPct" style="color:var(--accent);font-weight:700;">— %</span>
+        </div>
+        <div class="senti-analyzed-bar">
+          <div class="senti-analyzed-fill" id="sentiAnalyzedBar" style="width:0%"></div>
+        </div>
+        <div style="font-size:12px;color:var(--muted);">
+          待分析：<strong id="sentiPending">—</strong> 部 ／ 合計 <strong id="sentiTotal">—</strong> 部
+        </div>
+
+        <div style="margin-top:14px;font-size:12px;color:var(--muted);margin-bottom:6px;">情感分布</div>
+        <div class="senti-dist-bar" id="sentiDistBar">
+          <div class="senti-dist-pos" id="sentiDistPos" style="width:0%"></div>
+          <div class="senti-dist-neu" id="sentiDistNeu" style="width:0%"></div>
+          <div class="senti-dist-neg" id="sentiDistNeg" style="width:0%"></div>
+        </div>
+        <div class="senti-dist-legend">
+          <span><div class="senti-dot" style="background:var(--positive)"></div>正面 <strong id="sentiPos">—</strong></span>
+          <span><div class="senti-dot" style="background:var(--warning)"></div>中性 <strong id="sentiNeu">—</strong></span>
+          <span><div class="senti-dot" style="background:var(--negative)"></div>負面 <strong id="sentiNeg">—</strong></span>
+        </div>
+
+        <div style="margin-top:12px;">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <button class="btn btn-success btn-sm" id="analyzeBtn2" onclick="triggerAnalyze()">🤖 手動觸發情感分析</button>
+            <select id="analyzeLimit" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--text);">
+              <option value="20">最多 20 部</option>
+              <option value="50" selected>最多 50 部</option>
+              <option value="100">最多 100 部</option>
+              <option value="200">最多 200 部</option>
+            </select>
+          </div>
+          <div class="analyze-status" id="analyzeStatus"></div>
+        </div>
+      </div>
+
+      <!-- 右：說明與數字卡 -->
+      <div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">情感分析詳細</div>
+        <div class="senti-stat-row">
+          <span class="senti-label">平均情感分數</span>
+          <span class="senti-value" id="sentiAvg">— %</span>
+        </div>
+        <div class="senti-stat-row">
+          <span class="senti-label">正面（≥ 0.6）</span>
+          <span class="senti-value" style="color:var(--positive)" id="sentiPosDetail">—</span>
+        </div>
+        <div class="senti-stat-row">
+          <span class="senti-label">中性（0.4–0.6）</span>
+          <span class="senti-value" style="color:var(--warning)" id="sentiNeuDetail">—</span>
+        </div>
+        <div class="senti-stat-row">
+          <span class="senti-label">負面（≤ 0.4）</span>
+          <span class="senti-value" style="color:var(--negative)" id="sentiNegDetail">—</span>
+        </div>
+        <div class="senti-stat-row">
+          <span class="senti-label">待分析</span>
+          <span class="senti-value" id="sentiPendingDetail">—</span>
+        </div>
+
+        <div class="callout" style="margin-top:14px;font-size:11px;line-height:1.7;">
+          💡 <strong>排程說明</strong><br>
+          自動：每日 03:00 批次標記（APScheduler）<br>
+          模型：Gemini gemini-3.5-flash<br>
+          手動：最多一次分析 200 部未標記影片<br>
+          需設定 <code>GEMINI_API_KEY</code> 才能執行
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
 <!-- 操作說明 -->
 <div class="callout mb-2">
   💡 <strong>APScheduler 排程</strong>：每 6 小時自動爬取（APScheduler）、每日 03:00 批次情感標記。
@@ -166,6 +271,11 @@
 
 {% block extra_js %}
 <script>
+function getCsrf(){
+  var m = document.cookie.match(/csrftoken=([^;]+)/);
+  return m ? decodeURIComponent(m[1]) : '';
+}
+
 function loadData(){
   fetch('/crawler-admin/api/youtube_quota/')
     .then(r=>r.json())
@@ -179,25 +289,126 @@ function loadData(){
       if(circle){ circle.setAttribute('stroke-dasharray', pct + ' ' + (100-pct)); }
       var ts = document.getElementById('quotaRefreshTime');
       if(ts){ ts.textContent = '更新於 ' + new Date().toLocaleTimeString('zh-TW'); }
-    }).catch(()=>{});
+    })
+    .catch(function(err){ console.error('[youtube] quota load error', err); });
+}
+
+function loadSentimentStats(){
+  fetch('/crawler-admin/api/youtube-sentiment-stats/')
+    .then(function(r){
+      if(!r.ok){ throw new Error('HTTP ' + r.status); }
+      return r.json();
+    })
+    .then(function(d){
+      var analyzed = d.analyzed || 0;
+      var total    = d.total    || 0;
+      var pending  = d.pending  || 0;
+      var pos      = d.positive || 0;
+      var neu      = d.neutral  || 0;
+      var neg      = d.negative || 0;
+      var pct      = d.analyzed_pct || 0;
+
+      setText('sentiAnalyzed', analyzed);
+      setText('sentiTotal', total);
+      setText('sentiPending', pending);
+      setText('sentiAnalyzedPct', pct + '%');
+      setText('sentiAvg', d.avg_sentiment + '%');
+      setText('sentiPos', pos);
+      setText('sentiNeu', neu);
+      setText('sentiNeg', neg);
+      setText('sentiPosDetail', pos + ' 部');
+      setText('sentiNeuDetail', neu + ' 部');
+      setText('sentiNegDetail', neg + ' 部');
+      setText('sentiPendingDetail', pending + ' 部');
+
+      setWidth('sentiAnalyzedBar', pct);
+
+      if(analyzed > 0){
+        setWidth('sentiDistPos', Math.round(pos / analyzed * 100));
+        setWidth('sentiDistNeu', Math.round(neu / analyzed * 100));
+        setWidth('sentiDistNeg', Math.round(neg / analyzed * 100));
+      }
+
+      var ts = document.getElementById('sentiRefreshTime');
+      if(ts){ ts.textContent = '更新於 ' + new Date().toLocaleTimeString('zh-TW'); }
+    })
+    .catch(function(err){ console.error('[youtube] sentiment stats error', err); });
+}
+
+function setText(id, val){
+  var el = document.getElementById(id);
+  if(el){ el.textContent = val; }
+}
+
+function setWidth(id, pct){
+  var el = document.getElementById(id);
+  if(el){ el.style.width = pct + '%'; }
 }
 
 function triggerCrawl(){
   var btn = document.getElementById('crawlBtn');
   btn.disabled = true; btn.textContent = '爬取中…';
-  fetch('/crawler-admin/api/youtube_crawl/', {method:'POST', headers:{'X-CSRFToken': getCsrf()}})
-    .then(r=>r.json())
-    .then(d=>{
+  fetch('/crawler-admin/api/youtube_crawl/', {
+    method: 'POST',
+    headers: {'X-CSRFToken': getCsrf()}
+  })
+    .then(function(r){
+      if(!r.ok){ throw new Error('HTTP ' + r.status); }
+      return r.json();
+    })
+    .then(function(){
       alert('YouTube 爬取已啟動（最多 20 部）。約 1 分鐘後重新整理頁面查看結果。');
       btn.disabled = false; btn.textContent = '▶ 手動爬取';
-    }).catch(()=>{ btn.disabled = false; btn.textContent = '▶ 手動爬取'; });
+    })
+    .catch(function(err){
+      alert('啟動失敗：' + err.message);
+      btn.disabled = false; btn.textContent = '▶ 手動爬取';
+    });
 }
 
-function getCsrf(){
-  var m = document.cookie.match(/csrftoken=([^;]+)/);
-  return m ? m[1] : '';
+function triggerAnalyze(){
+  var btns = ['analyzeBtn','analyzeBtn2'];
+  btns.forEach(function(id){ var b=document.getElementById(id); if(b){b.disabled=true; b.textContent='分析中…';} });
+
+  var limit = document.getElementById('analyzeLimit');
+  var limitVal = limit ? limit.value : '50';
+
+  var status = document.getElementById('analyzeStatus');
+  if(status){ status.textContent = '正在送出請求…'; }
+
+  var body = new URLSearchParams();
+  body.append('limit', limitVal);
+
+  fetch('/crawler-admin/api/youtube-analyze/', {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': getCsrf(),
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    body: body.toString()
+  })
+    .then(function(r){
+      if(!r.ok){ return r.json().then(function(d){ throw new Error(d.error || 'HTTP ' + r.status); }); }
+      return r.json();
+    })
+    .then(function(d){
+      if(status){ status.textContent = '✅ 分析任務已在背景啟動（最多 ' + limitVal + ' 部），約需 1–5 分鐘，完成後請重新整理。'; }
+      btns.forEach(function(id){ var b=document.getElementById(id); if(b){b.disabled=false; b.textContent='🤖 手動觸發情感分析';} });
+      var crawlBtn = document.getElementById('crawlBtn');
+      if(crawlBtn){ crawlBtn.disabled=false; crawlBtn.textContent='🤖 手動情感分析'; }
+      setTimeout(loadSentimentStats, 8000);
+    })
+    .catch(function(err){
+      if(status){ status.textContent = '❌ 啟動失敗：' + err.message; }
+      btns.forEach(function(id){ var b=document.getElementById(id); if(b){b.disabled=false; b.textContent='🤖 手動觸發情感分析';} });
+      var crawlBtn = document.getElementById('crawlBtn');
+      if(crawlBtn){ crawlBtn.disabled=false; crawlBtn.textContent='🤖 手動情感分析'; }
+    });
 }
 
-$(function(){ loadData(); });
+$(function(){
+  loadData();
+  loadSentimentStats();
+});
 </script>
 {% endblock %}

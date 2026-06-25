@@ -4,7 +4,7 @@
 ### Uma Musume Information Platform
 
 <p>
-  <img src="https://img.shields.io/badge/版本-0.6.43--alpha-blueviolet?style=for-the-badge" alt="version">
+  <img src="https://img.shields.io/badge/版本-0.6.59--alpha-blueviolet?style=for-the-badge" alt="version">
   <img src="https://img.shields.io/badge/Python-3.12+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="python">
   <img src="https://img.shields.io/badge/Django-5.2-092E20?style=for-the-badge&logo=django&logoColor=white" alt="django">
   <img src="https://img.shields.io/badge/Docker-支援-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="docker">
@@ -420,13 +420,16 @@ umamusume-information-platform/
 
 | 版本 | 日期 | 主要變更 |
 |------|------|---------|
-| `0.6.43-alpha` | 2026-06-25 | 修正 Discord Bot PID 路徑偵測問題 |
-| `0.6.42-alpha` | 2026-06-25 | 修復 Discord 推播 async ORM 呼叫問題 |
-| `0.6.41-alpha` | 2026-06-25 | Dashboard 多項修復（路由/情感分數/N+1/分頁） |
-| `0.6.40-alpha` | 2026-06-25 | 留言情感儀表板「0 已分析」修復 |
-| `0.6.39-alpha` | 2026-06-25 | 首頁 AI 新聞載入修復 + Gemini Image 模型更新 |
-| `0.6.38-alpha` | 2026-06-25 | AI 新聞橫幅四項視覺優化 |
-| `0.6.34-alpha` | 2026-06-25 | 賽馬娘人氣列表獨立頁面 + 首頁 AI 新聞重設計 |
+| `0.6.59-alpha` | 2026-06-25 | YouTube 控制台新增情感分析管理面板 |
+| `0.6.58-alpha` | 2026-06-25 | LangChain Agent 改為 tool calling，修復思考模型 500 |
+| `0.6.57-alpha` | 2026-06-25 | RAG Agent 保留 thought_signature，修復 400 錯誤 |
+| `0.6.56-alpha` | 2026-06-25 | 熱門角色/關鍵詞頁 jQuery、Chart.js 改本機靜態檔 |
+| `0.6.55-alpha` | 2026-06-25 | 新增 SQLite → Docker PostgreSQL 搬遷腳本 |
+| `0.6.54-alpha` | 2026-06-25 | 三個 Agent 頁模型改由 `UMA_CHAT_MODEL` 集中管理 |
+| `0.6.53-alpha` | 2026-06-25 | 移除 `/agent/chat/` 全頁，改由 VRM widget 取代 |
+| `0.6.52-alpha` | 2026-06-25 | Agent 頁淺色主題修復 + `/rag/` 查詢 500 防護 |
+| `0.6.51-alpha` | 2026-06-25 | YouTube 儀表板情感趨勢圖篩選與空值修復 |
+| `0.6.47-alpha` | 2026-06-25 | Docker 改 PostgreSQL + Discord Bot entrypoint 修正 |
 
 ---
 

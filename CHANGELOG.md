@@ -21,7 +21,62 @@ Security (安全)：安全性漏洞的修復。
 
 －－－
 
-## [0.6.51-alpha] - 2026-06-25
+## [0.6.59-alpha] - 2026-06-25
+
+### Added
+- **`/crawler-admin/youtube/` 情感分析使用面板**（`app_crawler_admin/templates/app_crawler_admin/youtube.html`、`app_crawler_admin/api_views.py`、`app_crawler_admin/urls.py`、`app_youtube_uma/management/commands/analyze_youtube_sentiment.py`）
+  - 變更目的：後台管理頁原本只有爬取控制，無法在介面上查看情感分析覆蓋率，也無法手動觸發分析；新增面板讓管理員隨時掌握分析狀態並按需觸發。
+  - 主要影響範圍：
+    - `youtube.html`：頁面標題區新增「🤖 手動情感分析」快捷按鈕；影片列表後方加入「🤖 情感分析管理」卡片，包含已分析/待分析進度條、正面/中性/負面分布色條與數量、平均情感分數、手動觸發按鈕（可選分析批次上限 20/50/100/200 部）及排程說明提示。
+    - `api_views.py`：新增 `api_youtube_sentiment_stats()`（GET，回傳 total/analyzed/pending/positive/neutral/negative/avg_sentiment）與 `api_youtube_analyze()`（POST，以 subprocess 非同步呼叫 `manage.py analyze_youtube_sentiment --limit N`）。
+    - `urls.py`：新增路由 `api/youtube-sentiment-stats/` 與 `api/youtube-analyze/`。
+    - `app_youtube_uma/management/commands/analyze_youtube_sentiment.py`：新管理指令，支援 `--limit` 參數，串接 Gemini gemini-3.5-flash 逐部影片分析留言樣本並寫入 `YouTubeVideo.sentiment`，輸出每部影片的 skip/ok/err 狀態。
+  - 驗收方式：開啟 `http://localhost/crawler-admin/youtube/`，應看到「情感分析管理」面板正確顯示已分析數、待分析數、情感分布；點擊「手動觸發情感分析」後狀態列顯示「✅ 分析任務已在背景啟動」，約 8 秒後統計數字自動更新；若 GEMINI_API_KEY 未設定，管理指令會輸出跳過訊息而非崩潰。
+
+## [0.6.58-alpha] - 2026-06-25
+
+### Fixed
+- **`/langchain-agent/` 思考模型不相容導致 500 Internal Server Error**（`app_agent_langchain/views.py`）
+  - 變更目的：原本使用 `create_react_agent`（文字格式 ReAct：Thought/Action/Action Input/Observation），此格式需要模型嚴格輸出固定文字，但 `gemini-3.1-flash-lite` 等思考型模型會在回應中夾帶內部推理輸出，導致 LangChain 的 ReAct 格式解析器失敗並拋出例外，最終呈現為 HTTP 500。
+  - 主要影響範圍：
+    - `app_agent_langchain/views.py`：`_build_agent()` 改用 `create_tool_calling_agent`（原生 function calling）取代 `create_react_agent`；提示模板改為 `ChatPromptTemplate`（含 `system` / `chat_history` / `human` / `agent_scratchpad` 插槽）；`api_chat` 呼叫時補傳 `chat_history: []`。
+  - 驗收方式：開啟 `/langchain-agent/`，輸入任意問題（如「最新的活動公告有哪些？」），應取得正常回覆，不再出現 500 錯誤；Docker logs 不應再出現 `Internal Server Error: /langchain-agent/api/chat/`。
+
+## [0.6.57-alpha] - 2026-06-25
+
+### Fixed
+- **`/rag-agent/` 思考模型 Function Calling 400 INVALID_ARGUMENT 錯誤**（`app_rag_agent/views.py`）
+  - 變更目的：`gemini-3.1-flash-lite` 等思考型（thinking）模型在呼叫工具時，回應 parts 中內嵌 `thought_signature`；若重新手動建構 model 訊息物件（丟棄 `thought_signature`），下一輪送出時 Gemini API 會回傳 `400 INVALID_ARGUMENT: Function call is missing a thought_signature`。
+  - 主要影響範圍：
+    - `app_rag_agent/views.py`（`api_chat`）：
+      1. 將手動重建的 `messages.append({'role': 'model', 'parts': [...]})` 改為直接 `messages.append(candidate.content)`，保留原始 `thought_signature`。
+      2. function_call 偵測改為遍歷所有 parts（`next(...)`），避免思考模型將 thought 輸出在 `parts[0]`、function_call 在後續 part 時被錯誤略過。
+      3. 文字回應同樣遍歷所有 parts 找第一個有 `.text` 的 part。
+  - 驗收方式：在 `/rag-agent/` 頁面輸入任意問題（如「這週哪些馬娘在活動中最熱？」），應正確觸發 `search_uma_announcements` 工具並回傳完整答案，不再出現 400 錯誤。
+
+## [0.6.56-alpha] - 2026-06-25
+
+### Fixed
+- **`/uma_top_character/` 與 `/uma_top_keyword/` AJAX 無法觸發**（`app_uma_top_character/templates/.../home.html`、`app_uma_top_keyword/templates/.../home.html`、`base.html`）
+  - 變更目的：兩頁點擊「查詢」或載入後圖表完全不顯示，nginx log 確認瀏覽器從未發出 POST 請求；根本原因為 jQuery 從 `code.jquery.com` CDN 外部載入，在部分網路環境或瀏覽器快取失效時無法取得，導致 `$` 未定義、`call_ajax()` 靜默崩潰。
+  - 主要影響範圍：
+    - `templates/base.html`：jQuery CDN 改為本機靜態檔 `vendor/jquery-3.6.0.min.js`，消除外部 CDN 依賴。
+    - 兩頁 `home.html`：Chart.js CDN 改為本機 `vendor/Chart-2.7.3.min.js`；補齊 AJAX `error` handler；加入 X-CSRFToken header；`call_ajax()` 初始呼叫移至 `$(document).ready()` 內確保時序正確；宣告 `barchart` 變數避免全域汙染。
+    - `static/vendor/`：新增 `jquery-3.6.0.min.js`、`Chart-2.7.3.min.js` 本機副本。
+  - 驗收方式：開啟 `http://localhost/uma_top_character/` 與 `http://localhost/uma_top_keyword/`，頁面載入後應自動顯示「活動」類別的長條圖；nginx log 應出現對應的 POST 請求；選擇其他類別或點擊「查詢」應更新圖表；若 API 失敗應在清單區顯示紅色錯誤訊息。
+
+## [0.6.55-alpha] - 2026-06-25
+
+### Added
+- **本機 dev server（SQLite）→ Docker PostgreSQL 搬遷腳本**（`scripts/migrate_dev_to_docker.ps1`、`scripts/reset_postgres_sequences.py`）
+  - 變更目的：將舊 `python manage.py runserver` 累積的 SQLite 資料（含 Discord 訊息、爬蟲設定、Uma Info 伺服器設定等）完整匯入 Docker 版 PostgreSQL，避免 Docker 啟動後只剩 CSV 初始化的部分資料。
+  - 主要影響範圍：
+    - `scripts/migrate_dev_to_docker.ps1`：`dumpdata` → `flush` → `loaddata` → 同步 `media/` 至 Docker volume → 重啟服務。
+    - `scripts/reset_postgres_sequences.py`：`loaddata` 後重設 PostgreSQL 序列，避免後續新增資料 PK 衝突。
+    - `.gitignore`：忽略 `data/dev_sqlite_dump.json`（搬遷中間產物，約 85MB）。
+  - 驗收方式：執行腳本後 `docker exec web-poa python manage.py shell -c "from app_user_keyword_db.models import NewsData; print(NewsData.objects.count())"` 應為 **3758**（與 `db.sqlite3` 一致）；`/crawler-admin/`、`/uma-info/` 應可看到原 dev 環境的爬蟲紀錄與 Discord 伺服器設定。
+
+## [0.6.54-alpha] - 2026-06-25
 
 ### Changed
 - **三個 Agent 頁面 AI 模型型號改從後端設定讀取**（`app_agent_langchain/`、`app_agent_langgraph/`、`app_rag_agent/`）
@@ -34,7 +89,7 @@ Security (安全)：安全性漏洞的修復。
     - 三個 `chat.html`：badge 由硬編碼文字改為 `{{ model_name }}`。
   - 驗收方式：開啟 `/langchain-agent/`、`/langgraph-agent/`、`/rag-agent/` 三頁，頁首 badge 應顯示 `settings.py` 的 `UMA_CHAT_MODEL` 值（預設 `gemini-3.5-flash`）；修改 `.env` 的 `UMA_CHAT_MODEL` 重啟後三頁 badge 同步更新。
 
-## [0.6.50-alpha] - 2026-06-25
+## [0.6.53-alpha] - 2026-06-25
 
 ### Removed
 - **移除 `/agent/chat/` 全頁聊天介面**（`app_agent_uma/templates/app_agent_uma/home.html` 已刪除；`app_agent_uma/views.py`、`templates/base.html` 同步更新）
@@ -42,7 +97,7 @@ Security (安全)：安全性漏洞的修復。
   - 主要影響範圍：`home.html` 已刪除；`chat_view` GET 處理器改為轉址至首頁（`app_character_pk:home`），POST 端點保留供 VRM widget 繼續呼叫；`base.html` AI 功能選單移除「Agentic AI 助理」連結。
   - 驗收方式：直接造訪 `http://localhost:8000/agent/chat/` 應 301 轉址至首頁；VRM 成田路 widget 仍可正常傳送訊息並取得 AI 回覆；導覽列「AI 功能」選單已無「Agentic AI 助理」項目。
 
-## [0.6.50-alpha] - 2026-06-25
+## [0.6.52-alpha] - 2026-06-25
 
 ### Fixed
 - **`/langchain-agent/` 與 `/langgraph-agent/` 淺色主題顯示異常**（`app_agent_langchain/templates/.../chat.html`、`app_agent_langgraph/templates/.../chat.html`）
@@ -54,7 +109,7 @@ Security (安全)：安全性漏洞的修復。
   - 修正：`action == "query"` 分支加 `try-except`，異常時將錯誤訊息填入 `context["answer"]` 顯示給使用者；`embed_content(contents=query_text)` 改為 `contents=[query_text]` 與批次嵌入行為一致。
   - 驗收方式：開啟 `/rag/`，在已有向量庫的情況下送出問題，應顯示 AI 回答；若 API Key 未設定或 API 返回錯誤，應顯示「⚠️ 查詢發生錯誤：…」提示，不再出現 500 白頁。
 
-## [0.6.49-alpha] - 2026-06-25
+## [0.6.51-alpha] - 2026-06-25
 
 ### Fixed
 - **`/youtube/` 頁面情感趨勢圖表不顯示的 Bug**（`app_youtube_uma/views.py`、`app_youtube_uma/templates/app_youtube_uma/dashboard.html`）
@@ -62,7 +117,7 @@ Security (安全)：安全性漏洞的修復。
   - 主要影響範圍：`app_youtube_uma/views.py`（`api_stats` 新增 `q` 篩選與 `published_at__isnull=False` 條件）；`dashboard.html`（JS fetch URL 改為 `{% url %}?q={{ query|urlencode }}`）。
   - 驗收方式：開啟 `http://localhost:8000/youtube/?q=馬娘`，若 DB 中存有已情感分析的影片，圖表應顯示與搜尋關鍵字相符的週趨勢線；無相關資料時應顯示空狀態提示而非永久空白。
 
-## [0.6.48-alpha] - 2026-06-25
+## [0.6.50-alpha] - 2026-06-25
 
 ### Changed
 - **`/agent/chat/` 頁面 UI 調整**（`app_agent_uma/templates/app_agent_uma/home.html`）
@@ -70,7 +125,7 @@ Security (安全)：安全性漏洞的修復。
   - 主要影響範圍：`home.html` CSS 樣式與 `#chat-form` HTML 結構；新增 `.uma-chat-form-wrapper`、`.uma-input`、`.uma-send-btn` 等賽馬娘主題樣式（左側紫金漸層賽道色條、馬蹄形圖示輸入框、紫金漸層送出按鈕）。
   - 驗收方式：開啟 `http://localhost:8000/agent/chat/`，頁面底部應顯示帶有左側色條、馬圖示輸入框與紫金漸層「發送」按鈕的輸入區；說明與範例提示詞區塊應已消失。
 
-## [0.6.47-alpha] - 2026-06-25
+## [0.6.49-alpha] - 2026-06-25
 
 ### Fixed
 - **修復 `/uma_top_keyword/` 頁面完全不顯示資料的 Bug**（`app_uma_top_keyword/templates/app_uma_top_keyword/home.html`）
@@ -78,7 +133,7 @@ Security (安全)：安全性漏洞的修復。
   - 主要影響範圍：`app_uma_top_keyword/templates/app_uma_top_keyword/home.html`（將 `const MAX_TOPK = 30` 移至 `call_ajax()` 呼叫之前）
   - 驗收方式：開啟 `http://localhost:8000/uma_top_keyword/`，頁面載入後應自動顯示「活動」類別的熱門關鍵詞清單與長條圖；切換類別或點擊「查詢」皆可正常更新資料。
 
-## [0.6.46-alpha] - 2026-06-25
+## [0.6.48-alpha] - 2026-06-25
 
 ### Added
 - **新增課堂展示專用頁：`class-5min-demo-script.html`（行動裝置優先）**
@@ -98,7 +153,7 @@ Security (安全)：安全性漏洞的修復。
     - 點擊步驟連結按鈕可開啟對應網站路由；填入 Discord URL 後可開啟伺服器頁
     - `Speak English` 可朗讀當前步驟英文稿，語速滑桿生效
 
-## [0.6.45-alpha] - 2026-06-25
+## [0.6.47-alpha] - 2026-06-25
 
 ### Fixed
 - **修復 Docker 部署時 Discord Bot 從未啟動（`docker-files-poa/entrypoint.sh`）**
@@ -120,7 +175,7 @@ Security (安全)：安全性漏洞的修復。
 ### Security
 - 連帶解決並發寫入造成的資料庫不穩（含先前疑似 `db.sqlite3` 截斷／`disk I/O error`），降低設定與推播紀錄寫入遺失風險。
 
-## [0.6.44-alpha] - 2026-06-25
+## [0.6.46-alpha] - 2026-06-25
 
 ### Changed
 - **`project-intro.html` 升級為「專頁式互動專案介紹頁」**
@@ -136,16 +191,18 @@ Security (安全)：安全性漏洞的修復。
     - 在路由總表輸入關鍵字可即時過濾，無結果時顯示提示訊息
     - 三態主題（light / dark / system）切換後，新增區塊字色與互動元件可正常閱讀
 
-## [0.6.43-alpha] - 2026-06-25
+## [0.6.45-alpha] - 2026-06-25
 
 ### Fixed
-- **持久 Bot 狀態仍被誤判離線（PID 寫入路徑層級錯誤）**
-  - 症狀：`run_discord_bot` 已連上 Gateway，但 `get_bot_status()` 顯示 `running=False`，`news` 任務誤走 thread/臨時連線路徑
-  - 根因：`run_discord_bot.py` 的 PID 路徑誤用 `parents[4]`，寫到專案外層，`bot_manager` 在專案根目錄找不到 pid 檔
-  - 修正：改為 `parents[3] / 'discord_bot.pid'`（專案根目錄）
-  - 驗收：`get_bot_status()` 回傳 `{'running': True, 'source': 'pidfile'}`，新建 `news` 任務 runner 為 `bot` 且可成功推播
+- **確認 Embed 與推播完全靜默失敗的根本原因：`api_views.py` 缺少 `import logging`**（`app_uma_info_portal/api_views.py`）
 
-## [0.6.42-alpha] - 2026-06-25
+  `_send_news_channel_confirm_embed()` 在錯誤處理分支呼叫 `logging.getLogger()` 但頂層沒有 `import logging`，導致執行時拋 `NameError`，整個函式靜默失敗，前端完全收不到反應。
+
+  **修正**：在 `api_views.py` 頂部加入 `import logging`。
+
+  **驗收**：shell 測試 `ok=True`，`#research-outsourcing` 頻道已收到確認 Embed。
+
+## [0.6.44-alpha] - 2026-06-25
 
 ### Fixed
 - **`/crawler-admin/ai-news/` Discord 推播全面失敗（根因：async context 直接操作 ORM）**
@@ -162,7 +219,7 @@ Security (安全)：安全性漏洞的修復。
       - 新增無效頻道 ID、頻道型別不支援 `send()` 的失敗計數與日誌
   - 驗收：手動推播任務可完成並寫入 `DiscordNewsLog(status='sent')`；異常頻道會寫 `failed` 原因且不拖垮整批
 
-## [0.6.41-alpha] - 2026-06-25
+## [0.6.43-alpha] - 2026-06-25
 
 ### Fixed
 - **`/dashboard/` 多項問題修復**
@@ -175,7 +232,7 @@ Security (安全)：安全性漏洞的修復。
   - 影響範圍：`app_dashboard/views.py`、`app_dashboard/api_views.py`、`templates/dashboard.html`、`announcement_detail.html`、`announcement_list.html`
   - 驗收方式：`/dashboard/` 最新公告點擊可進入詳情頁；`/dashboard/announcements/` 顯示分頁；情緒分數 > 0 時數字與進度條一致
 
-## [0.6.40-alpha] - 2026-06-25
+## [0.6.42-alpha] - 2026-06-25
 
 ### Fixed
 - **留言情感儀表板「0 已分析」問題修復**
@@ -186,7 +243,7 @@ Security (安全)：安全性漏洞的修復。
   - 影響範圍：`app_comment_sentiment/management/commands/analyze_articles.py`（新增）、`app_comment_sentiment/views.py`、`requirements.txt`
   - 驗收方式：執行 `python manage.py analyze_articles --limit 3` 後，DB 中對應文章的 `analyzed_at` 應有值，儀表板「已分析」數字應大於 0
 
-## [0.6.39-alpha] - 2026-06-25
+## [0.6.41-alpha] - 2026-06-25
 
 ### Fixed
 - **首頁 AI 新聞載入失敗修復**
@@ -201,7 +258,7 @@ Security (安全)：安全性漏洞的修復。
 
 ---
 
-## [0.6.38-alpha] - 2026-06-25
+## [0.6.40-alpha] - 2026-06-25
 
 ### Changed
 - **首頁版面調整：AI 新聞橫幅四項優化**（`app_character_pk/templates/app_character_pk/home.html`）
@@ -219,6 +276,15 @@ Security (安全)：安全性漏洞的修復。
 
 ---
 
+## [0.6.39-alpha] - 2026-06-25
+
+### Fixed
+- **持久 Bot 狀態仍被誤判離線（PID 寫入路徑層級錯誤）**
+  - 症狀：`run_discord_bot` 已連上 Gateway，但 `get_bot_status()` 顯示 `running=False`，`news` 任務誤走 thread/臨時連線路徑
+  - 根因：`run_discord_bot.py` 的 PID 路徑誤用 `parents[4]`，寫到專案外層，`bot_manager` 在專案根目錄找不到 pid 檔
+  - 修正：改為 `parents[3] / 'discord_bot.pid'`（專案根目錄）
+  - 驗收：`get_bot_status()` 回傳 `{'running': True, 'source': 'pidfile'}`，新建 `news` 任務 runner 為 `bot` 且可成功推播
+
 ## [0.6.38-alpha] - 2026-06-25
 
 ### Fixed
@@ -232,17 +298,6 @@ Security (安全)：安全性漏洞的修復。
 
 ## [0.6.37-alpha] - 2026-06-25
 
-### Fixed
-- **確認 Embed 與推播完全靜默失敗的根本原因：`api_views.py` 缺少 `import logging`**（`app_uma_info_portal/api_views.py`）
-
-  `_send_news_channel_confirm_embed()` 在錯誤處理分支呼叫 `logging.getLogger()` 但頂層沒有 `import logging`，導致執行時拋 `NameError`，整個函式靜默失敗，前端完全收不到反應。
-
-  **修正**：在 `api_views.py` 頂部加入 `import logging`。
-
-  **驗收**：shell 測試 `ok=True`，`#research-outsourcing` 頻道已收到確認 Embed。
-
-## [0.6.36-alpha] - 2026-06-25
-
 ### Changed
 - **首頁 AI 新聞封面橫幅：三項視覺優化**（`app_character_pk/templates/app_character_pk/home.html`）
 
@@ -253,7 +308,7 @@ Security (安全)：安全性漏洞的修復。
 
   **驗收方式**：亮/深色主題下標題文字皆清晰可讀；圖片完整顯示不被裁切（16:9 比例）
 
-## [0.6.35-alpha] - 2026-06-25
+## [0.6.36-alpha] - 2026-06-25
 
 ### Fixed
 - **首頁 AI 新聞卡：封面圖下方大片空白問題**（`app_character_pk/templates/app_character_pk/home.html`）
@@ -268,7 +323,7 @@ Security (安全)：安全性漏洞的修復。
 
   **驗收方式**：無論正文長短，頁面均無左側大片空白；封面圖有無皆正常渲染
 
-## [0.6.34-alpha] - 2026-06-25
+## [0.6.35-alpha] - 2026-06-25
 
 ### Added
 - **新增「賽馬娘人氣列表」獨立頁面**（`app_character_pk`）
@@ -308,15 +363,6 @@ Security (安全)：安全性漏洞的修復。
 ## [0.6.34-alpha] - 2026-06-25
 
 ### Fixed
-- **ai-news 頁面推播至 Discord 失敗**（`app_crawler_admin/discord_push.py`）
-
-  `push_text_to_guilds()` 使用 `bot.get_channel()` 只搜本地快取，頻道不在快取時靜默失敗（同 scheduler 的問題）。
-
-  **修正**：加入 `await bot.fetch_channel()` fallback，直接查詢 Discord API。
-
-## [0.6.33-alpha] - 2026-06-25
-
-### Fixed
 - **AI 新聞推播失敗（根本原因：`generate_news()` 參數不匹配）**（`app_discord_bot/news_generator.py`、`scheduler.py`）
 
   **根本原因**：`scheduler.py` 第 94 行呼叫 `generate_news(model=model_env, tone=tone)`，但 `generate_news()` 簽章不接受 `tone` 參數 → 拋 `TypeError` → 主推播流程整個崩潰，最終任務顯示「成功 0、失敗 0」但實際未送出任何訊息。
@@ -336,7 +382,7 @@ Security (安全)：安全性漏洞的修復。
 
   **驗收**：選擇文字頻道儲存 → 收到確認 Embed；若 Bot 缺權限或頻道類型不符 → 前端顯示明確原因。
 
-## [0.6.32-alpha] - 2026-06-25
+## [0.6.33-alpha] - 2026-06-25
 
 ### Fixed
 - **AI 新聞推播到 Discord 頻道失敗**（`app_discord_bot/scheduler.py`、`ai_chat.py`）
@@ -350,6 +396,15 @@ Security (安全)：安全性漏洞的修復。
   - `ai_chat.py`：改從 `app_user_keyword_db.models.NewsData` 正確 import，修正欄位名稱（`date`、`content`）
 
   **驗收**：Bot 手動推播成功，Discord 頻道收到 AI 新聞摘要。
+
+## [0.6.32-alpha] - 2026-06-25
+
+### Fixed
+- **ai-news 頁面推播至 Discord 失敗**（`app_crawler_admin/discord_push.py`）
+
+  `push_text_to_guilds()` 使用 `bot.get_channel()` 只搜本地快取，頻道不在快取時靜默失敗（同 scheduler 的問題）。
+
+  **修正**：加入 `await bot.fetch_channel()` fallback，直接查詢 Discord API。
 
 ## [0.6.31-alpha] - 2026-06-25
 

@@ -70,30 +70,44 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.3/Chart.min.js"></script>
+<script src="{% static 'vendor/Chart-2.7.3.min.js' %}"></script>
 <script>
   const MAX_TOPK = 30;
+  let barchart = null;
 
-  call_ajax();
-
-  $('#cate-selected').on('change', function () { call_ajax(); });
-  $('#btn-ok').on('click', function () { call_ajax(); });
+  function getCsrfToken() {
+    return document.cookie.split(';').reduce(function (val, c) {
+      var pair = c.trim().split('=');
+      return pair[0] === 'csrftoken' ? decodeURIComponent(pair[1]) : val;
+    }, '');
+  }
 
   function call_ajax() {
-    let cate = $('#cate-selected').val();
-    let topk = Math.min(parseInt($('#topk-selected').val()) || 10, MAX_TOPK);
+    var cate = $('#cate-selected').val();
+    var topk = Math.min(parseInt($('#topk-selected').val()) || 10, MAX_TOPK);
     $('#topk-selected').val(topk);
 
     $.ajax({
       type: 'POST',
       url: '/uma_top_keyword/api_get_cate_topword/',
       data: { news_category: cate, topk: topk },
+      headers: { 'X-CSRFToken': getCsrfToken() },
       success: function (received) {
         showTopKeys(received.wf_pairs);
         showChart(received.chart_data);
+      },
+      error: function (xhr, status, err) {
+        console.error('[uma_top_keyword] AJAX 失敗', status, err, xhr.responseText);
+        $('#topkeys').html('<li class="list-group-item text-danger">載入失敗，請重新整理（' + status + '）</li>');
       }
     });
   }
+
+  $(document).ready(function () {
+    call_ajax();
+    $('#cate-selected').on('change', function () { call_ajax(); });
+    $('#btn-ok').on('click', function () { call_ajax(); });
+  });
 
   function showTopKeys(items) {
     $('#topkeys').empty();

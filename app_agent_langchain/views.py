@@ -20,12 +20,16 @@ def chat_view(request):
 
 
 def _build_agent():
-    """建立 LangChain ReAct Agent（惰性初始化）"""
+    """建立 LangChain Tool-Calling Agent（惰性初始化）
+
+    注意：原本的 create_react_agent（文字格式 ReAct）與思考型模型（如 gemini-3.1-flash-lite）
+    不相容，模型輸出的內部推理會干擾 ReAct 格式解析導致 500。
+    改用 create_tool_calling_agent 使用原生 function calling，避免此問題。
+    """
     from langchain_google_genai import ChatGoogleGenerativeAI
     from langchain_core.tools import tool
-    from langchain_core.messages import HumanMessage, SystemMessage
-    from langchain.agents import AgentExecutor, create_react_agent
-    from langchain_core.prompts import PromptTemplate
+    from langchain.agents import AgentExecutor, create_tool_calling_agent
+    from langchain_core.prompts import ChatPromptTemplate
     from django.db.models import Q
 
     llm = ChatGoogleGenerativeAI(
@@ -82,30 +86,19 @@ def _build_agent():
 
     tools = [search_announcements, list_by_category, get_announcement_detail]
 
-    # ReAct 提示模板（LangChain 1.x 標準格式）
-    react_template = """你是「馬娘情報站 LangChain ReAct 助理」，專門回答賽馬娘 Pretty Derby 相關問題。
-你可以使用以下工具：
+    # Tool-Calling Agent 提示模板（支援思考型模型，不依賴文字格式解析）
+    prompt = ChatPromptTemplate.from_messages([
+        (
+            'system',
+            '你是「馬娘情報站 LangChain 助理」，專門回答賽馬娘 Pretty Derby 相關問題。\n'
+            '回答使用繁體中文，引用資料來源時格式：（來源：[ID:xxx] 標題）。',
+        ),
+        ('placeholder', '{chat_history}'),
+        ('human', '{input}'),
+        ('placeholder', '{agent_scratchpad}'),
+    ])
 
-{tools}
-
-使用以下格式回答：
-
-Question: 你需要回答的問題
-Thought: 思考需要使用哪個工具
-Action: 工具名稱（必須是 [{tool_names}] 之一）
-Action Input: 工具輸入
-Observation: 工具回傳結果
-... （可重複 Thought/Action/Observation 多次）
-Thought: 我現在知道最終答案了
-Final Answer: 最終的繁體中文回答，必須引用來源
-
-Begin!
-
-Question: {input}
-Thought: {agent_scratchpad}"""
-
-    prompt = PromptTemplate.from_template(react_template)
-    agent = create_react_agent(llm, tools, prompt)
+    agent = create_tool_calling_agent(llm, tools, prompt)
     return AgentExecutor(agent=agent, tools=tools, verbose=False, handle_parsing_errors=True, max_iterations=6)
 
 
@@ -132,7 +125,7 @@ def api_chat(request):
 
     try:
         agent = _get_agent()
-        result = agent.invoke({'input': user_msg})
+        result = agent.invoke({'input': user_msg, 'chat_history': []})
         reply = result.get('output', '（無回覆）')
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
